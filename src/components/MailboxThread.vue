@@ -145,6 +145,11 @@ export default {
 			return this.$store.getters.getMailbox(UNIFIED_INBOX_ID)
 		},
 		hasEnvelopes() {
+			if (this.mailbox.isPriorityInbox) {
+				return this.$store.getters.getEnvelopes(this.mailbox.databaseId, this.appendToSearch(priorityImportantQuery)).length > 0
+					|| this.$store.getters.getEnvelopes(this.mailbox.databaseId, this.appendToSearch(priorityStarredQuery)).length > 0
+					|| this.$store.getters.getEnvelopes(this.mailbox.databaseId, this.appendToSearch(priorityOtherQuery)).length > 0
+			}
 			return this.$store.getters.getEnvelopes(this.mailbox.databaseId, this.searchQuery).length > 0
 		},
 		showThread() {
@@ -153,7 +158,7 @@ export default {
 		query() {
 			if (this.$route.params.filter === 'starred') {
 				if (this.searchQuery) {
-					return this.searchQuery + ' is:starred'
+					return this.appendToSearch('is:starred')
 				}
 				return 'is:starred'
 			}
