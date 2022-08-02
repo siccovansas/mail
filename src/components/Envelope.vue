@@ -13,7 +13,8 @@
 		:data-envelope-id="data.databaseId"
 		:title="addresses"
 		:details="formatted()"
-		@click="onClick">
+		@click="onClick"
+		@update:menuOpen="moreActionsOpen = false">
 		<template #icon>
 			<div
 				v-if="mailbox.isUnified && hasMultipleAccounts"
