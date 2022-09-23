@@ -191,8 +191,13 @@ class OutboxController extends Controller {
 	 * @param int $id
 	 * @return JsonResponse
 	 */
-	public function send(int $id): JsonResponse {
+	public function send(int $id, bool force = false): JsonResponse {
 		$message = $this->service->getMessage($id, $this->userId);
+
+		if($this->service->recipientCheck($message->getRecipients()) && $force === false) {
+			throw new ManyRecipientsException();
+		}
+
 		$account = $this->accountService->find($this->userId, $message->getAccountId());
 
 		$this->service->sendMessage($message, $account);
