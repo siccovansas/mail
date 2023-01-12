@@ -32,6 +32,8 @@ declare(strict_types=1);
 namespace OCA\Mail\Controller;
 
 use Exception;
+use Horde_Mime_Exception;
+use Horde_Mime_Part;
 use OC\Security\CSP\ContentSecurityPolicyNonceManager;
 use OCA\Mail\Contracts\IMailManager;
 use OCA\Mail\Contracts\IMailSearch;
@@ -42,8 +44,11 @@ use OCA\Mail\Exception\ClientException;
 use OCA\Mail\Exception\ServiceException;
 use OCA\Mail\Http\AttachmentDownloadResponse;
 use OCA\Mail\Http\HtmlResponse;
+use OCA\Mail\IMAP\IMAPClientFactory;
+use OCA\Mail\Model\SMimeData;
 use OCA\Mail\Service\AccountService;
 use OCA\Mail\Service\ItineraryService;
+use OCA\Mail\Service\SMimeService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -61,63 +66,22 @@ use Psr\Log\LoggerInterface;
 use function array_map;
 
 class MessagesController extends Controller {
+	private AccountService $accountService;
+	private IMailManager $mailManager;
+	private IMailSearch $mailSearch;
+	private ItineraryService $itineraryService;
+	private ?string $currentUserId;
+	private LoggerInterface $logger;
+	private ?Folder $userFolder;
+	private IMimeTypeDetector $mimeTypeDetector;
+	private IL10N $l10n;
+	private IURLGenerator $urlGenerator;
+	private ContentSecurityPolicyNonceManager $nonceManager;
+	private ITrustedSenderService $trustedSenderService;
+	private IMailTransmission $mailTransmission;
+	private SMimeService $sMimeService;
+	private IMAPClientFactory $clientFactory;
 
-	/** @var AccountService */
-	private $accountService;
-
-	/** @var IMailManager */
-	private $mailManager;
-
-	/** @var IMailSearch */
-	private $mailSearch;
-
-	/** @var ItineraryService */
-	private $itineraryService;
-
-	/** @var ?string */
-	private $currentUserId;
-
-	/** @var LoggerInterface */
-	private $logger;
-
-	/** @var Folder */
-	private $userFolder;
-
-	/** @var IMimeTypeDetector */
-	private $mimeTypeDetector;
-
-	/** @var IL10N */
-	private $l10n;
-
-	/** @var IURLGenerator */
-	private $urlGenerator;
-
-	/** @var ContentSecurityPolicyNonceManager */
-	private $nonceManager;
-
-	/** @var ITrustedSenderService */
-	private $trustedSenderService;
-
-	/** @var IMailTransmission */
-	private $mailTransmission;
-
-	/**
-	 * @param string $appName
-	 * @param IRequest $request
-	 * @param AccountService $accountService
-	 * @param IMailManager $mailManager
-	 * @param IMailSearch $mailSearch
-	 * @param ItineraryService $itineraryService
-	 * @param string $UserId
-	 * @param $userFolder
-	 * @param LoggerInterface $logger
-	 * @param IL10N $l10n
-	 * @param IMimeTypeDetector $mimeTypeDetector
-	 * @param IURLGenerator $urlGenerator
-	 * @param ContentSecurityPolicyNonceManager $nonceManager
-	 * @param ITrustedSenderService $trustedSenderService
-	 * @param IMailTransmission $mailTransmission
-	 */
 	public function __construct(string $appName,
 								IRequest $request,
 								AccountService $accountService,
@@ -132,7 +96,9 @@ class MessagesController extends Controller {
 								IURLGenerator $urlGenerator,
 								ContentSecurityPolicyNonceManager $nonceManager,
 								ITrustedSenderService $trustedSenderService,
-								IMailTransmission $mailTransmission) {
+								IMailTransmission $mailTransmission,
+								SMimeService $sMimeService,
+								IMAPClientFactory $clientFactory) {
 		parent::__construct($appName, $request);
 		$this->accountService = $accountService;
 		$this->mailManager = $mailManager;
@@ -147,6 +113,8 @@ class MessagesController extends Controller {
 		$this->nonceManager = $nonceManager;
 		$this->trustedSenderService = $trustedSenderService;
 		$this->mailTransmission = $mailTransmission;
+		$this->sMimeService = $sMimeService;
+		$this->clientFactory = $clientFactory;
 	}
 
 	/**
@@ -241,12 +209,24 @@ class MessagesController extends Controller {
 			return new JSONResponse([], Http::STATUS_FORBIDDEN);
 		}
 
-		$json = $this->mailManager->getImapMessage(
-			$account,
-			$mailbox,
-			$message->getUid(),
-			true
-		)->getFullMessage($id);
+		$client = $this->clientFactory->getClient($account);
+		try {
+			$json = $this->mailManager->getImapMessage(
+				$client,
+				$account,
+				$mailbox,
+				$message->getUid(), true
+			)->getFullMessage($id);
+			$rawMessage = $this->mailManager->getSource(
+				$client,
+				$account,
+				$mailbox->getName(),
+				$message->getUid(),
+			);
+		} finally {
+			$client->logout();
+		}
+
 		$itineraries = $this->itineraryService->getCached($account, $mailbox, $message->getUid());
 		if ($itineraries) {
 			$json['itineraries'] = $itineraries;
@@ -262,10 +242,22 @@ class MessagesController extends Controller {
 		$json['databaseId'] = $message->getId();
 		$json['isSenderTrusted'] = $this->isSenderTrusted($message);
 
+		$sMimeData = new SMimeData();
+		try {
+			$parsedMessage = Horde_Mime_Part::parseMessage($rawMessage, ['no_body' => true]);
+			if ($parsedMessage->getType() === 'multipart/signed') {
+				$sMimeData->setIsSigned(true);
+				$sMimeData->setSignatureIsValid($this->sMimeService->verifyMessage($rawMessage));
+			}
+		} catch (Horde_Mime_Exception $e) {
+			$this->logger->warning('Failed to parse MIME message', ['error' => $e]);
+		}
+		$json['sMime'] = $sMimeData;
+
 		$response = new JSONResponse($json);
 
 		// Enable caching
-		$response->cacheFor(60 * 60);
+		$response->cacheFor(60 * 60, false, true);
 
 		return $response;
 	}
@@ -289,7 +281,9 @@ class MessagesController extends Controller {
 			return new JSONResponse([], Http::STATUS_FORBIDDEN);
 		}
 
-		return new JsonResponse($this->itineraryService->extract($account, $mailbox, $message->getUid()));
+		$response = new JsonResponse($this->itineraryService->extract($account, $mailbox, $message->getUid()));
+		$response->cacheFor(24 * 60 * 60, false, true);
+		return $response;
 	}
 
 	private function isSenderTrusted(Message $message): bool {
@@ -423,18 +417,64 @@ class MessagesController extends Controller {
 			return new JSONResponse([], Http::STATUS_FORBIDDEN);
 		}
 
-		$response = new JSONResponse([
-			'source' => $this->mailManager->getSource(
+		$client = $this->clientFactory->getClient($account);
+		try {
+			$response = new JSONResponse([
+				'source' => $this->mailManager->getSource(
+					$client,
+					$account,
+					$mailbox->getName(),
+					$message->getUid()
+				)
+			]);
+		} finally {
+			$client->logout();
+		}
+
+		// Enable caching
+		$response->cacheFor(60 * 60, false, true);
+
+		return $response;
+	}
+
+	/**
+	 * Export a whole message as an .eml file.
+	 *
+	 * @NoAdminRequired
+	 * @NoCSRFRequired
+	 * @TrapError
+	 *
+	 * @param int $id
+	 * @return Response
+	 * @throws ClientException
+	 * @throws ServiceException
+	 */
+	public function export(int $id): Response {
+		try {
+			$message = $this->mailManager->getMessage($this->currentUserId, $id);
+			$mailbox = $this->mailManager->getMailbox($this->currentUserId, $message->getMailboxId());
+			$account = $this->accountService->find($this->currentUserId, $mailbox->getAccountId());
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse([], Http::STATUS_FORBIDDEN);
+		}
+
+		$client = $this->clientFactory->getClient($account);
+		try {
+			$source = $this->mailManager->getSource(
+				$client,
 				$account,
 				$mailbox->getName(),
 				$message->getUid()
-			)
-		]);
+			);
+		} finally {
+			$client->logout();
+		}
 
-		// Enable caching
-		$response->cacheFor(60 * 60);
-
-		return $response;
+		return new AttachmentDownloadResponse(
+			$source,
+			$message->getSubject() . '.eml',
+			'message/rfc822',
+		);
 	}
 
 	/**
@@ -464,14 +504,21 @@ class MessagesController extends Controller {
 				);
 			}
 
-			$html = $this->mailManager->getImapMessage(
-				$account,
-				$mailbox,
-				$message->getUid(),
-				true
-			)->getHtmlBody(
-				$id
-			);
+			$client = $this->clientFactory->getClient($account);
+			try {
+				$html = $this->mailManager->getImapMessage(
+					$client,
+					$account,
+					$mailbox,
+					$message->getUid(),
+					true
+				)->getHtmlBody(
+					$id
+				);
+			} finally {
+				$client->logout();
+			}
+
 			$htmlResponse = $plain ?
 				HtmlResponse::plain($html) :
 				HtmlResponse::withResizer(
@@ -492,7 +539,7 @@ class MessagesController extends Controller {
 			$htmlResponse->setContentSecurityPolicy($policy);
 
 			// Enable caching
-			$htmlResponse->cacheFor(60 * 60);
+			$htmlResponse->cacheFor(60 * 60, false, true);
 
 			return $htmlResponse;
 		} catch (Exception $ex) {

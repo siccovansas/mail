@@ -3,6 +3,7 @@
   -
   - @author 2020 Christoph Wurst <christoph@winzerhof-wurst.at>
   - @author 2021 Richard Steinmetz <richard@steinmetz.cloud>
+  - @author 2022 Jonas Sulzer <jonas@violoncello.ch>
   -
   - @license AGPL-3.0-or-later
   -
@@ -21,9 +22,9 @@
   -->
 
 <template>
-	<div class="envelope">
-		<div class="envelope--header"
-			:class="{'list-item-style' : expanded }">
+	<div class="envelope"
+		:class="{'envelope--expanded' : expanded }">
+		<div class="envelope__header">
 			<Avatar v-if="envelope.from && envelope.from[0]"
 				:email="envelope.from[0].email"
 				:display-name="envelope.from[0].label"
@@ -39,14 +40,14 @@
 				v-if="envelope.flags.flagged"
 				fill-color="#f9cf3d"
 				:size="18"
-				:class="{ 'junk-favorite-position': junkFavoritePosition, 'junk-favorite-position-with-tag-subject': junkFavoritePositionWithTagSubject }"
+				:class="{ 'junk-favorite-position': junkFavoritePosition, 'junk-favorite-position-with-tag-subline': junkFavoritePositionWithTagSubline }"
 				class="app-content-list-item-star favorite-icon-style"
 				:data-starred="envelope.flags.flagged ? 'true' : 'false'"
 				@click.prevent="onToggleFlagged" />
 			<JunkIcon
 				v-if="envelope.flags.$junk"
 				:size="18"
-				:class="{ 'junk-favorite-position': junkFavoritePosition, 'junk-favorite-position-with-tag-subject': junkFavoritePositionWithTagSubject }"
+				:class="{ 'junk-favorite-position': junkFavoritePosition, 'junk-favorite-position-with-tag-subline': junkFavoritePositionWithTagSubline }"
 				class="app-content-list-item-star junk-icon-style"
 				:data-starred="envelope.flags.$junk ? 'true' : 'false'"
 				@click.prevent="onToggleJunk" />
@@ -56,14 +57,12 @@
 				class="left"
 				:class="{seen: envelope.flags.seen}"
 				@click.native.prevent="$emit('toggle-expand', $event)">
-				<div class="sender"
-					:class="{ 'centered-sender': centeredSender }">
+				<div class="sender">
 					{{ envelope.from && envelope.from[0] ? envelope.from[0].label : '' }}
 				</div>
-				<div v-if="hasChangedSubject" class="subject">
+				<div v-if="showSubline" class="subline">
 					<span class="preview">
-						<!-- TODO: instead of subject it should be shown the first line of the message #2666 -->
-						{{ cleanSubject }}
+						{{ isEncrypted ? t('mail', 'Encrypted message') : envelope.previewText }}
 					</span>
 				</div>
 				<div v-for="tag in tags"
@@ -77,69 +76,159 @@
 			</router-link>
 			<div class="right">
 				<Moment class="timestamp" :timestamp="envelope.dateInt" />
-				<Button
-					:class="{ primary: expanded}"
-					type="primary"
-					@click="onReply">
-					<template #icon>
-						<ReplyAllIcon v-if="hasMultipleRecipients"
-							:size="20" />
-						<ReplyIcon v-else
-							:size="20" />
-					</template>
-					<span class="action-label"> {{ hasMultipleRecipients ? t('mail', 'Reply all') : t('mail', 'Reply') }}</span>
-				</Button>
-				<MenuEnvelope class="app-content-list-item-menu"
-					:envelope="envelope"
-					:with-reply="false"
-					:with-select="false"
-					:with-show-source="true"
-					@delete="$emit('delete',envelope.databaseId)" />
+				<template v-if="expanded">
+					<NcActions v-if="sMimeData.isSigned">
+						<template #icon>
+							<LockIcon v-if="sMimeData.signatureIsValid"
+								:size="20"
+								fill-color="#ffcc00" />
+							<LockOffIcon v-else
+								:size="20"
+								fill-color="red" />
+						</template>
+						<NcActionText>
+							{{ sMimeSignMessage }}
+						</NcActionText>
+						<!-- TODO: display information about signer and/or CA certificate -->
+					</NcActions>
+					<ButtonVue
+						:class="{ primary: expanded}"
+						:title="hasMultipleRecipients ? t('mail', 'Reply all') : t('mail', 'Reply')"
+						type="tertiary-no-background"
+						@click="onReply">
+						<template #icon>
+							<ReplyAllIcon v-if="hasMultipleRecipients"
+								:size="20" />
+							<ReplyIcon v-else
+								:size="20" />
+						</template>
+					</ButtonVue>
+					<ButtonVue
+						type="tertiary-no-background"
+						class="action--primary"
+						:title="envelope.flags.flagged ? t('mail', 'Mark as unfavorite') : t('mail', 'Mark as favorite')"
+						:close-after-click="true"
+						@click.prevent="onToggleFlagged">
+						<template #icon>
+							<StarOutline v-if="showFavoriteIconVariant"
+								:size="20" />
+							<IconFavorite v-else
+								:size="20" />
+						</template>
+					</ButtonVue>
+					<ButtonVue
+						type="tertiary-no-background"
+						class="action--primary"
+						:title="envelope.flags.seen ? t('mail', 'Mark as unread') : t('mail', 'Mark as read')"
+						:close-after-click="true"
+						@click.prevent="onToggleSeen">
+						<template #icon>
+							<EmailRead v-if="showImportantIconVariant"
+								:size="20" />
+							<EmailUnread v-else
+								:size="20" />
+						</template>
+					</ButtonVue>
+					<ButtonVue v-if="showArchiveButton"
+						:close-after-click="true"
+						type="tertiary-no-background"
+						@click.prevent="onArchive">
+						<template #icon>
+							<ArchiveIcon
+								:title="t('mail', 'Archive message')"
+								:size="20" />
+						</template>
+					</ButtonVue>
+					<ButtonVue :close-after-click="true"
+						type="tertiary-no-background"
+						@click.prevent="onDelete">
+						<template #icon>
+							<DeleteIcon
+								:title="t('mail', 'Delete message')"
+								:size="20" />
+						</template>
+					</ButtonVue>
+					<MenuEnvelope class="app-content-list-item-menu"
+						:envelope="envelope"
+						:with-reply="false"
+						:with-select="false"
+						:with-show-source="true"
+						@delete="$emit('delete',envelope.databaseId)" />
+				</template>
 			</div>
 		</div>
-		<Loading v-if="loading" />
-		<Message v-else-if="message"
+		<MessageLoadingSkeleton v-if="loading !== LOADING_DONE" />
+		<Message v-if="message && loading !== LOADING_MESSAGE"
+			v-show="loading === LOADING_DONE"
 			:envelope="envelope"
 			:message="message"
-			:full-height="fullHeight" />
+			:full-height="fullHeight"
+			@load="loading = LOADING_DONE" />
 		<Error v-else-if="error"
 			:error="error && error.message ? error.message : t('mail', 'Not found')"
-			:message="errorMessage"
+			message=""
 			:data="error"
 			role="alert" />
 	</div>
 </template>
 <script>
 import Avatar from './Avatar'
-import Button from '@nextcloud/vue/dist/Components/Button'
+import { NcButton as ButtonVue } from '@nextcloud/vue'
 import Error from './Error'
 import importantSvg from '../../img/important.svg'
 import IconFavorite from 'vue-material-design-icons/Star'
 import JunkIcon from './icons/JunkIcon'
-import Loading from './Loading'
+import MessageLoadingSkeleton from './MessageLoadingSkeleton'
 import logger from '../logger'
 import Message from './Message'
 import MenuEnvelope from './MenuEnvelope'
 import Moment from './Moment'
 import ReplyIcon from 'vue-material-design-icons/Reply'
 import ReplyAllIcon from 'vue-material-design-icons/ReplyAll'
+import StarOutline from 'vue-material-design-icons/StarOutline'
+import DeleteIcon from 'vue-material-design-icons/Delete'
+import ArchiveIcon from 'vue-material-design-icons/PackageDown'
+import EmailUnread from 'vue-material-design-icons/Email'
+import EmailRead from 'vue-material-design-icons/EmailOpen'
+import LockIcon from 'vue-material-design-icons/Lock'
+import LockOffIcon from 'vue-material-design-icons/LockOff'
 import { buildRecipients as buildReplyRecipients } from '../ReplyBuilder'
+import { hiddenTags } from './tags.js'
+import { showError } from '@nextcloud/dialogs'
+import { matchError } from '../errors/match'
+import NoTrashMailboxConfiguredError from '../errors/NoTrashMailboxConfiguredError'
+import { isPgpText } from '../crypto/pgp'
+import NcActions from '@nextcloud/vue/dist/Components/NcActions'
+import NcActionText from '@nextcloud/vue/dist/Components/NcActionText'
+
+// Ternary loading state
+const LOADING_DONE = 0
+const LOADING_MESSAGE = 1
+const LOADING_BODY = 2
 
 export default {
 	name: 'ThreadEnvelope',
 	components: {
 		Avatar,
-		Button,
+		ButtonVue,
 		Error,
 		IconFavorite,
 		JunkIcon,
-		Loading,
+		MessageLoadingSkeleton,
 		MenuEnvelope,
 		Moment,
 		Message,
 		ReplyIcon,
 		ReplyAllIcon,
-
+		StarOutline,
+		EmailRead,
+		EmailUnread,
+		DeleteIcon,
+		ArchiveIcon,
+		LockIcon,
+		LockOffIcon,
+		NcActions,
+		NcActionText,
 	},
 	props: {
 		envelope: {
@@ -154,10 +243,6 @@ export default {
 			],
 			default: undefined,
 		},
-		threadSubject: {
-			required: true,
-			type: String,
-		},
 		expanded: {
 			required: false,
 			type: Boolean,
@@ -168,14 +253,22 @@ export default {
 			type: Boolean,
 			default: false,
 		},
+		withSelect: {
+			// "Select" action should only appear in envelopes from the envelope list
+			type: Boolean,
+			default: true,
+		},
 	},
 	data() {
 		return {
-			loading: false,
+			loading: LOADING_DONE,
 			error: undefined,
 			message: undefined,
 			importantSvg,
 			seenTimer: undefined,
+			LOADING_BODY,
+			LOADING_DONE,
+			LOADING_MESSAGE,
 		}
 	},
 	computed: {
@@ -203,28 +296,50 @@ export default {
 				},
 			}
 		},
+		isEncrypted() {
+			return this.envelope.previewText
+				&& isPgpText(this.envelope.previewText)
+		},
 		isImportant() {
 			return this.$store.getters
 				.getEnvelopeTags(this.envelope.databaseId)
 				.find((tag) => tag.imapLabel === '$label1')
 		},
 		tags() {
-			return this.$store.getters.getEnvelopeTags(this.envelope.databaseId).filter((tag) => tag.imapLabel !== '$label1')
+			return this.$store.getters.getEnvelopeTags(this.envelope.databaseId).filter(
+				(tag) => tag.imapLabel !== '$label1' && !(tag.displayName.toLowerCase() in hiddenTags)
+			)
 		},
-		hasChangedSubject() {
-			return this.cleanSubject !== this.threadSubject
+		showSubline() {
+			return !this.expanded && !!this.envelope.previewText
 		},
-		cleanSubject() {
-			return this.envelope.subject.replace(/((?:[\t ]*(?:R|RE|F|FW|FWD):[\t ]*)*)/i, '')
-		},
-		centeredSender() {
-			  return (!this.hasChangedSubject || this.cleanSubject.length === 0) && this.tags.length === 0
+		showArchiveButton() {
+			return this.account.archiveMailboxId !== null
 		},
 		junkFavoritePosition() {
-			return (this.message?.subject > 0 || this.cleanSubject.length > 0) && this.tags.length > 0
+			return this.showSubline && this.tags.length > 0
 		},
-		junkFavoritePositionWithTagSubject() {
-			return (!this.hasChangedSubject || this.cleanSubject.length === 0) && this.tags.length > 0
+		junkFavoritePositionWithTagSubline() {
+			return !this.showSubline && this.tags.length > 0
+		},
+		showFavoriteIconVariant() {
+			return this.envelope.flags.flagged
+		},
+		showImportantIconVariant() {
+			return this.envelope.flags.seen
+		},
+		/**
+		 * @return {{isSigned: (boolean|undefined), signatureIsValid: (boolean|undefined)}}
+		 */
+		sMimeData() {
+			return this.message?.sMime ?? {}
+		},
+		sMimeSignMessage() {
+			if (this.sMimeData.signatureIsValid) {
+				return t('mail', 'This message contains a verified digital S/MIME signature. The message wasn\'t changed since it was sent.')
+			} else {
+				return t('mail', 'This message contains an unverified digital S/MIME signature. The message might have been changed since it was sent or the certificate of the signer is untrusted.')
+			}
 		},
 	},
 	watch: {
@@ -233,6 +348,7 @@ export default {
 				this.fetchMessage()
 			} else {
 				this.message = undefined
+				this.loading = LOADING_DONE
 			}
 		},
 	},
@@ -253,7 +369,7 @@ export default {
 	},
 	methods: {
 		async fetchMessage() {
-			this.loading = true
+			this.loading = LOADING_MESSAGE
 
 			logger.debug(`fetching thread message ${this.envelope.databaseId}`)
 
@@ -269,7 +385,11 @@ export default {
 					}, 2000)
 				}
 
-				this.loading = false
+				if (this.message.hasHtmlBody) {
+					this.loading = LOADING_BODY
+				} else {
+					this.loading = LOADING_DONE
+				}
 			} catch (error) {
 				logger.error('Could not fetch message', { error })
 			}
@@ -318,6 +438,57 @@ export default {
 		onToggleJunk() {
 			this.$store.dispatch('toggleEnvelopeJunk', this.envelope)
 		},
+		onToggleSeen() {
+			this.$store.dispatch('toggleEnvelopeSeen', { envelope: this.envelope })
+		},
+		async onDelete() {
+			// Remove from selection first
+			if (this.withSelect) {
+				this.$emit('unselect')
+			}
+
+			// Delete
+			this.$emit('delete', this.envelope.databaseId)
+
+			logger.info(`deleting message ${this.envelope.databaseId}`)
+
+			try {
+				await this.$store.dispatch('deleteMessage', {
+					id: this.envelope.databaseId,
+				})
+			} catch (error) {
+				showError(await matchError(error, {
+					[NoTrashMailboxConfiguredError.getName()]() {
+						return t('mail', 'No trash mailbox configured')
+					},
+					default(error) {
+						logger.error('could not delete message', error)
+						return t('mail', 'Could not delete message')
+					},
+				}))
+			}
+		},
+		async onArchive() {
+			// Remove from selection first
+			if (this.withSelect) {
+				this.$emit('unselect')
+			}
+
+			// Archive
+			this.$emit('archive', this.envelope.databaseId)
+
+			logger.info(`archiving message ${this.envelope.databaseId}`)
+
+			try {
+				await this.$store.dispatch('moveMessage', {
+					id: this.envelope.databaseId,
+					destMailboxId: this.account.archiveMailboxId,
+				})
+			} catch (error) {
+				logger.error('could not archive message', error)
+				return t('mail', 'Could not archive message')
+			}
+		},
 	},
 }
 </script>
@@ -325,9 +496,6 @@ export default {
 <style lang="scss" scoped>
 	.sender {
 		margin-left: 8px;
-	}
-	.centered-sender {
-		margin-top: 8px;
 	}
 
 	.right {
@@ -344,7 +512,7 @@ export default {
 
 		.timestamp {
 			margin-right: 10px;
-			font-size: small;
+			color: var(--color-text-maxcontrast);
 			white-space: nowrap;
 			margin-bottom: 0;
 		}
@@ -362,51 +530,68 @@ export default {
 			}
 		}
 	}
-	.avatardiv {
-		display: inline-block;
-		margin-bottom: -23px;
-	}
-	.subject {
-		margin-left: 8px;
-		cursor: default;
-	}
 
 	.envelope {
 		display: flex;
 		flex-direction: column;
-		box-shadow: 0 0 10px var(--color-box-shadow);
+		border: 2px solid var(--color-border);
 		border-radius: 16px;
 		margin-left: 10px;
 		margin-right: 10px;
 		background-color: var(--color-main-background);
-		padding-bottom: 20px;
+		padding-bottom: 28px;
+		animation: show 200ms 90ms cubic-bezier(.17, .67, .83, .67) forwards;
+		opacity: 0.5;
+		transform-origin: top center;
+		@keyframes show {
+			100% {
+				opacity: 1;
+				transform: none;
+			}
+		}
 
 		& + .envelope {
-			margin-top: -20px;
+			margin-top: -28px;
 		}
 
 		&:last-of-type {
 			margin-bottom: 10px;
 			padding-bottom: 0;
 		}
-	}
 
-	.envelope--header {
-		position: relative;
-		display: flex;
-		padding: 10px;
-		border-radius: var(--border-radius);
+		&__header {
+			position: relative;
+			display: flex;
+			align-items: center;
+			padding: 10px;
+			border-radius: var(--border-radius);
+			min-height: 68px; /* prevents jumping between open/collapsed */
+		}
 
-		&:hover {
-			background-color: var(--color-background-hover);
-			border-radius: 16px;
+		.subline {
+			margin-left: 8px;
+			color: var(--color-text-maxcontrast);
+			cursor: default;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		&--expanded {
+			min-height: 350px;
 		}
 	}
 	.left {
 		flex-grow: 1;
+		min-width: 0; /* https://css-tricks.com/flexbox-truncated-text/ */
+		display: inline-block;
+		position: relative;
+		z-index: 1;
+		padding: 2em;
+		margin: -2em;
 	}
 	.icon-important {
-		::v-deep path {
+		:deep(path) {
 			fill: #ffcc00;
 			stroke: var(--color-main-background);
 			cursor: pointer;
@@ -420,6 +605,7 @@ export default {
 			height: 16px;
 			margin-left: -1px;
 			display: flex;
+			top: 12px;
 
 			&:hover,
 			&:focus {
@@ -430,9 +616,11 @@ export default {
 	.app-content-list-item-star.favorite-icon-style {
 		display: inline-block;
 		position: absolute;
-		top: 8px;
-		left: 40px;
+		top: 10px;
+		left: 36px;
 		cursor: pointer;
+		stroke: var(--color-main-background);
+		stroke-width: 2;
 		&:hover {
 			opacity: .5;
 		}
@@ -440,8 +628,8 @@ export default {
 	.app-content-list-item-star.junk-icon-style {
 		display: inline-block;
 		position: absolute;
-		top: 8px;
-		left: 40px;
+		top: 10px;
+		left: 36px;
 		cursor: pointer;
 		opacity: .2;
 		&:hover {
@@ -476,14 +664,10 @@ export default {
 		overflow: hidden;
 		left: 4px;
 	}
-	.envelope--header.list-item-style {
-		border-radius: 16px;
-	}
-	.junk-favorite-position-with-tag-subject {
+	.junk-favorite-position-with-tag-subline {
 		margin-bottom: 14px !important;
 	}
 	.junk-favorite-position {
 		margin-bottom: 36px !important;
 	}
-
 </style>

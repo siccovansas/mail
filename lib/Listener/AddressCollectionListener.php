@@ -33,8 +33,10 @@ use OCP\EventDispatcher\IEventListener;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
+/**
+ * @template-implements IEventListener<Event|MessageSentEvent>
+ */
 class AddressCollectionListener implements IEventListener {
-
 	/** @var IUserPreferences */
 	private $preferences;
 

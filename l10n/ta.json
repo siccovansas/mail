@@ -13,21 +13,22 @@
     "Move" : "Move",
     "Create" : "உருவாக்குக",
     "Choose" : "தெரிவுசெய்க ",
-    "Favorites" : "விருப்பங்கள்",
     "Other" : "மற்றவை",
-    "Settings" : "அமைப்புகள்",
     "Quota" : "பங்கு",
     "Saving" : "Saving",
     "Delete" : "நீக்குக",
     "Add" : "சேர்க்க",
+    "Tags" : "சீட்டுகள்",
+    "Search" : "Search",
+    "Date" : "Date",
     "Remove" : "அகற்றுக",
     "General" : "பொதுவான",
     "User" : "User",
     "Host" : "ஓம்புனர்",
     "Port" : "துறை ",
     "Keyboard shortcuts" : "விசைப்பலகை குறுக்குவழிகள்",
-    "Search" : "Search",
     "Refresh" : "மீள் ஏற்றுக",
-    "All" : "எல்லாம்"
+    "All" : "எல்லாம்",
+    "Favorites" : "விருப்பங்கள்"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

@@ -14,6 +14,9 @@ env:
 
 jobs:
   build_and_publish:
+    permissions:
+      contents: write # for release creation (svenstaro/upload-release-action)
+
     runs-on: ubuntu-latest
 
     # Only allowed to be run on nextcloud-releases repositories
@@ -39,7 +42,7 @@ jobs:
           expression: "//info//dependencies//nextcloud/@min-version"
 
       - name: Read package.json node and npm engines version
-        uses: skjnldsv/read-package-engines-version-actions@v1.2
+        uses: skjnldsv/read-package-engines-version-actions@v2.0
         id: versions
         # Continue if no package.json
         continue-on-error: true
@@ -68,7 +71,7 @@ jobs:
 
       - name: Check composer.json
         id: check_composer
-        uses: andstor/file-existence-action@v1
+        uses: andstor/file-existence-action@v2
         with:
           files: "${{ env.APP_NAME }}/composer.json"
 

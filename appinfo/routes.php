@@ -165,6 +165,11 @@ return [
 			'verb' => 'DELETE'
 		],
 		[
+			'name' => 'mailboxes#clearMailbox',
+			'url' => '/api/mailboxes/{id}/clear',
+			'verb' => 'POST'
+		],
+		[
 			'name' => 'mailboxes#markAllAsRead',
 			'url' => '/api/mailboxes/{id}/read',
 			'verb' => 'POST'
@@ -202,6 +207,11 @@ return [
 		[
 			'name' => 'messages#getSource',
 			'url' => '/api/messages/{id}/source',
+			'verb' => 'GET'
+		],
+		[
+			'name' => 'messages#export',
+			'url' => '/api/messages/{id}/export',
 			'verb' => 'GET'
 		],
 		[
@@ -295,6 +305,11 @@ return [
 			'verb' => 'DELETE'
 		],
 		[
+			'name' => 'settings#setAllowNewMailAccounts',
+			'url' => '/api/settings/allownewaccounts',
+			'verb' => 'POST'
+		],
+		[
 			'name' => 'trusted_senders#setTrusted',
 			'url' => '/api/trustedsenders/{email}',
 			'verb' => 'PUT'
@@ -338,6 +353,21 @@ return [
 			'name' => 'outbox#send',
 			'url' => '/api/outbox/{id}',
 			'verb' => 'POST'
+		],
+		[
+			'name' => 'googleIntegration#configure',
+			'url' => '/api/integration/google',
+			'verb' => 'POST',
+		],
+		[
+			'name' => 'googleIntegration#unlink',
+			'url' => '/api/integration/google',
+			'verb' => 'DELETE',
+		],
+		[
+			'name' => 'googleIntegration#oauthRedirect',
+			'url' => '/integration/google-auth',
+			'verb' => 'GET',
 		],
 	],
 	'resources' => [

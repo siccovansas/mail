@@ -1,9 +1,11 @@
 { "translations": {
+    "Personal" : "Udmawan",
     "Mail" : "Tirawt",
     "Name" : "Nom",
     "Password" : "Awal uffir",
     "None" : "Ula d yiwen",
     "Save" : "Sekles",
+    "Email address" : "Tansa imayl",
     "Cancel" : "Sefsex",
     "Send" : "Tuzna",
     "Favorite" : "Menyif",
@@ -11,16 +13,17 @@
     "Forward" : "Avancer",
     "Create" : "Snulfu-d",
     "Choose" : "Fren",
-    "Favorites" : "Imenyafen",
-    "Settings" : "Iɣewwaṛen",
+    "Message" : "Izen",
     "Delete" : "Kkes",
     "Add" : "Rnu",
+    "Tags" : "Tibzimin",
+    "Search" : "Nadi",
     "Unset" : "Non défini",
     "Remove" : "Kkes",
     "General" : "Amatu",
     "User" : "Aseqdac",
-    "Search" : "Nadi",
     "Refresh" : "Sismeḍ",
+    "Favorites" : "Imenyafen",
     "Inbox" : "Tanaka"
 },"pluralForm" :"nplurals=2; plural=(n != 1);"
 }

@@ -40,6 +40,9 @@
 			<div class="sidebar-opacity-icon">
 				<ImportantIcon v-if="mailbox.isPriorityInbox"
 					:size="20" />
+				<IconAllInboxes
+					v-else-if="mailbox.id === UNIFIED_INBOX_ID"
+					:size="20" />
 				<IconInbox
 					v-else-if="mailbox.specialRole === 'inbox' && !mailbox.isPriorityInbox && filter !=='starred'"
 					:size="20" />
@@ -47,7 +50,7 @@
 					:size="20" />
 				<IconDraft v-else-if="mailbox.specialRole === 'drafts'"
 					:size="20" />
-				<CheckIcon v-else-if="mailbox.specialRole === 'sent'"
+				<IconSend v-else-if="mailbox.specialRole === 'sent'"
 					:size="20" />
 				<IconArchive v-else-if="mailbox.specialRole === 'archive'"
 					:size="20" />
@@ -71,23 +74,21 @@
 			</ActionText>
 
 			<ActionButton
-				v-if="mailbox.specialRole !== 'flagged' && !account.isUnified"
+				v-if="mailbox.specialRole !== 'flagged' && !account.isUnified && hasSeenAcl"
 				:title="t('mail', 'Mark all as read')"
 				:disabled="loadingMarkAsRead"
 				@click="markAsRead">
 				<template #icon>
 					<IconEmailCheck
-						:title="t('mail', 'Mark all messages of this mailbox as read')"
 						:size="20" />
 				</template>
 				{{ t('mail', 'Mark all messages of this mailbox as read') }}
 			</ActionButton>
 			<ActionButton
-				v-if="!editing && !account.isUnified && hasDelimiter && mailbox.specialRole !== 'flagged'"
+				v-if="!editing && !account.isUnified && hasDelimiter && mailbox.specialRole !== 'flagged' && hasSubmailboxActionAcl"
 				@click="openCreateMailbox">
 				<template #icon>
 					<IconFolderAdd
-						:title="t('mail', 'Add submailbox')"
 						:size="20" />
 				</template>
 				{{ t('mail', 'Add submailbox') }}
@@ -95,16 +96,14 @@
 			<ActionInput v-if="editing" @submit.prevent.stop="createMailbox">
 				<template #icon>
 					<IconFolderAdd
-						:title="t('mail', 'Add submailbox')"
 						:size="20" />
 				</template>
 			</ActionInput>
 			<ActionButton
-				v-if="renameLabel && !hasSubMailboxes && !account.isUnified"
+				v-if="renameLabel && !hasSubMailboxes && !account.isUnified && hasRenameAcl"
 				@click.prevent.stop="openRenameInput">
 				<template #icon>
 					<IconFolderRename
-						:title="t('mail', 'Edit name')"
 						:size="20" />
 				</template>
 				{{ t('mail', 'Edit name') }}
@@ -119,7 +118,11 @@
 						:size="20" />
 				</template>
 			</ActionInput>
-			<ActionText v-if="showSaving" icon="icon-loading-small">
+			<ActionText v-if="showSaving">
+				<template #icon>
+					<IconLoading
+						:size="20" />
+				</template>
 				{{ t('mail', 'Saving') }}
 			</ActionText>
 			<ActionButton v-if="!account.isUnified && hasDelimiter && !mailbox.specialRole && !hasSubMailboxes"
@@ -128,7 +131,6 @@
 				@click.prevent="onOpenMoveModal">
 				<template #icon>
 					<IconExternal
-						:title="t('mail', 'Move')"
 						:size="20" />
 				</template>
 				{{ t('mail', 'Move') }}
@@ -140,7 +142,6 @@
 				@click="clearCache">
 				<template #icon>
 					<IconFolderSync
-						:title="t('mail', 'Clear locally cached data, in case there are issues with synchronization.')"
 						:size="20" />
 				</template>
 				{{ t('mail', 'Clear locally cached data, in case there are issues with synchronization.') }}
@@ -162,18 +163,31 @@
 				{{ t('mail', 'Sync in background') }}
 			</ActionCheckbox>
 
-			<ActionButton v-if="!account.isUnified && !mailbox.specialRole && !hasSubMailboxes" @click="deleteMailbox">
+			<ActionButton
+				v-if="mailbox.specialRole !== 'flagged' && !account.isUnified"
+				:close-after-click="true"
+				@click="clearMailbox">
+				<template #icon>
+					<EraserVariant :size="20" />
+				</template>
+				{{ t('mail', 'Clear mailbox') }}
+			</ActionButton>
+
+			<ActionButton v-if="!account.isUnified && !mailbox.specialRole && !hasSubMailboxes && hasDeleteAcl"
+				@click="deleteMailbox">
 				<template #icon>
 					<IconDelete
-						:title="t('mail', 'Delete mailbox')"
 						:size="20" />
 				</template>
 				{{ t('mail', 'Delete mailbox') }}
 			</ActionButton>
 		</template>
-		<AppNavigationCounter v-if="showUnreadCounter && mailbox.specialRole !== 'trash'" slot="counter">
+		<CounterBubble v-if="showUnreadCounter && subCounter" slot="counter">
+			{{ mailbox.unread }}&nbsp;({{ subCounter }})
+		</CounterBubble>
+		<CounterBubble v-else-if="showUnreadCounter" slot="counter">
 			{{ mailbox.unread }}
-		</AppNavigationCounter>
+		</CounterBubble>
 		<template slot="extra">
 			<MoveMailboxModal v-if="showMoveModal"
 				:account="account"
@@ -190,13 +204,8 @@
 </template>
 
 <script>
-import AppNavigationItem from '@nextcloud/vue/dist/Components/AppNavigationItem'
-import AppNavigationCounter from '@nextcloud/vue/dist/Components/AppNavigationCounter'
-import ActionButton from '@nextcloud/vue/dist/Components/ActionButton'
-import ActionCheckbox from '@nextcloud/vue/dist/Components/ActionCheckbox'
-import ActionInput from '@nextcloud/vue/dist/Components/ActionInput'
-import ActionText from '@nextcloud/vue/dist/Components/ActionText'
-import CheckIcon from 'vue-material-design-icons/Check'
+
+import { NcAppNavigationItem as AppNavigationItem, NcCounterBubble as CounterBubble, NcActionButton as ActionButton, NcActionCheckbox as ActionCheckbox, NcActionInput as ActionInput, NcActionText as ActionText, NcLoadingIcon as IconLoading } from '@nextcloud/vue'
 import IconEmailCheck from 'vue-material-design-icons/EmailCheck'
 import IconExternal from 'vue-material-design-icons/OpenInNew'
 import IconFolder from 'vue-material-design-icons/Folder'
@@ -205,12 +214,16 @@ import IconFavorite from 'vue-material-design-icons/Star'
 import IconFolderRename from 'vue-material-design-icons/FolderEdit'
 import IconFolderSync from 'vue-material-design-icons/FolderSync'
 import IconDelete from 'vue-material-design-icons/Delete'
-import IconInfo from 'vue-material-design-icons/InformationOutline'
-import IconDraft from 'vue-material-design-icons/LeadPencil'
-import IconArchive from 'vue-material-design-icons/TrayFull'
+import IconInfo from 'vue-material-design-icons/Information'
+import IconDraft from 'vue-material-design-icons/Pencil'
+import IconArchive from 'vue-material-design-icons/PackageDown'
 import IconInbox from 'vue-material-design-icons/Home'
+import IconAllInboxes from 'vue-material-design-icons/InboxMultiple'
+import EraserVariant from 'vue-material-design-icons/EraserVariant'
 import ImportantIcon from './icons/ImportantIcon'
+import IconSend from 'vue-material-design-icons/Send'
 import MoveMailboxModal from './MoveMailboxModal'
+import { PRIORITY_INBOX_ID, UNIFIED_INBOX_ID } from '../store/constants'
 
 import { clearCache } from '../service/MessageService'
 import { getMailboxStatus } from '../service/MailboxService'
@@ -225,12 +238,12 @@ export default {
 	name: 'NavigationMailbox',
 	components: {
 		AppNavigationItem,
-		AppNavigationCounter,
+		CounterBubble,
 		ActionText,
 		ActionButton,
 		ActionCheckbox,
 		ActionInput,
-		CheckIcon,
+		IconSend,
 		IconDelete,
 		IconEmailCheck,
 		IconExternal,
@@ -238,12 +251,15 @@ export default {
 		IconFolderRename,
 		IconFolderSync,
 		IconInfo,
+		IconAllInboxes,
 		IconFavorite,
 		IconFolder,
 		IconDraft,
 		IconArchive,
 		IconInbox,
+		EraserVariant,
 		ImportantIcon,
+		IconLoading,
 		MoveMailboxModal,
 	},
 	directives: {
@@ -281,6 +297,7 @@ export default {
 			mailboxName: this.mailbox.displayName,
 			showMoveModal: false,
 			hasDelimiter: !!this.mailbox.delimiter,
+			UNIFIED_INBOX_ID,
 		}
 	},
 	computed: {
@@ -370,7 +387,43 @@ export default {
 			return this.mailbox.specialUse.includes('inbox') && this.$store.getters.accounts.length > 2
 		},
 		showUnreadCounter() {
-			return this.mailbox.unread > 0 && this.filter !== 'starred'
+			if (this.filter === 'starred' || this.mailbox.specialRole === 'trash') {
+				return false
+			}
+			return this.mailbox.unread > 0 || this.subCounter > 0
+		},
+		subCounter() {
+			return this.subMailboxes.reduce((carry, mb) => carry + mb.unread, 0)
+		},
+		hasRenameAcl() {
+			if (!this.mailbox.myAcls) {
+				return true
+			}
+			const parent = this.$store.getters.getParentMailbox(this.mailbox.databaseId)
+			if (!parent || !parent.myAcls) {
+				return this.mailbox.myAcls.indexOf('x') !== -1
+			}
+
+			return this.mailbox.myAcls.indexOf('x') !== -1
+				&& parent.myAcls.indexOf('k') !== -1
+		},
+		hasSeenAcl() {
+			if (!this.mailbox.myAcls) {
+				return true
+			}
+			return this.mailbox.myAcls.indexOf('s') !== -1
+		},
+		hasSubmailboxActionAcl() {
+			if (!this.mailbox.myAcls) {
+				return true
+			}
+			return this.mailbox.myAcls.indexOf('k') !== -1
+		},
+		hasDeleteAcl() {
+			if (!this.mailbox.myAcls) {
+				return true
+			}
+			return this.mailbox.myAcls.indexOf('x') !== -1
 		},
 	},
 	mounted() {
@@ -386,8 +439,9 @@ export default {
 	methods: {
 		/**
 		 * Generate unique key id for a specific mailbox
-		 * @param {Object} mailbox the mailbox to gen id for
-		 * @returns {string}
+		 *
+		 * @param {object} mailbox the mailbox to gen id for
+		 * @return {string}
 		 */
 		genId(mailbox) {
 			return 'mailbox-' + mailbox.databaseId
@@ -395,6 +449,7 @@ export default {
 
 		/**
 		 * On menu toggle, fetch stats
+		 *
 		 * @param {boolean} open menu opened state
 		 */
 		onMenuToggle(open) {
@@ -507,6 +562,29 @@ export default {
 				this.clearCache = false
 			}
 		},
+		clearMailbox() {
+			const id = this.mailbox.databaseId
+			OC.dialogs.confirmDestructive(
+				t('mail', 'All messages in mailbox will be deleted.'),
+				t('mail', 'Clear mailbox {name}', { name: this.mailbox.displayName }),
+				{
+					type: OC.dialogs.YES_NO_BUTTONS,
+					confirm: t('mail', 'Clear mailbox'),
+					confirmClasses: 'error',
+					cancel: t('mail', 'Cancel'),
+				},
+				(result) => {
+					if (result) {
+						return this.$store
+							.dispatch('clearMailbox', { mailbox: this.mailbox })
+							.then(() => {
+								logger.info(`mailbox ${id} cleared`)
+							})
+							.catch((error) => logger.error('could not clear mailbox', { error }))
+					}
+				}
+			)
+		},
 		deleteMailbox() {
 			const id = this.mailbox.databaseId
 			logger.info('delete mailbox', { mailbox: this.mailbox })
@@ -525,6 +603,14 @@ export default {
 							.dispatch('deleteMailbox', { mailbox: this.mailbox })
 							.then(() => {
 								logger.info(`mailbox ${id} deleted`)
+								if (parseInt(this.$route.params.mailboxId, 10) === this.mailbox.databaseId) {
+									this.$router.push({
+										name: 'mailbox',
+										params: {
+											mailboxId: PRIORITY_INBOX_ID,
+										},
+									})
+								}
 							})
 							.catch((error) => logger.error('could not delete mailbox', { error }))
 					}
@@ -605,5 +691,8 @@ export default {
 	&:hover {
 	opacity: 1;
 	}
+}
+.counter-bubble__counter {
+	max-width: initial;
 }
 </style>

@@ -27,62 +27,48 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Controller;
 
+use OCA\Mail\AppInfo\Application;
 use OCA\Mail\Contracts\IMailManager;
 use OCA\Mail\Contracts\IUserPreferences;
 use OCA\Mail\Service\OutboxService;
 use OCA\Mail\Db\TagMapper;
 use OCA\Mail\Service\AccountService;
 use OCA\Mail\Service\AliasesService;
+use OCA\Viewer\Event\LoadViewer;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Services\IInitialState;
+use OCP\Authentication\Exceptions\CredentialsUnavailableException;
+use OCP\Authentication\Exceptions\PasswordUnavailableException;
+use OCP\Authentication\LoginCredentials\IStore as ICredentialStore;
+use OCP\EventDispatcher\IEventDispatcher;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 use Throwable;
+use function class_exists;
+use function http_build_query;
 use function json_decode;
 
 class PageController extends Controller {
-
-	/** @var IURLGenerator */
-	private $urlGenerator;
-
-	/** @var IConfig */
-	private $config;
-
-	/** @var AccountService */
-	private $accountService;
-
-	/** @var AliasesService */
-	private $aliasesService;
-
-	/** @var string */
-	private $currentUserId;
-
-	/** @var IUserSession */
-	private $userSession;
-
-	/** @var IUserPreferences */
-	private $preferences;
-
-	/** @var IMailManager */
-	private $mailManager;
-
-	/** @var TagMapper */
-	private $tagMapper;
-
-	/** @var IInitialState */
-	private $initialStateService;
-
-	/** @var LoggerInterface */
-	private $logger;
-
-	/** @var OutboxService */
-	private $outboxService;
+	private IURLGenerator $urlGenerator;
+	private IConfig $config;
+	private AccountService $accountService;
+	private AliasesService $aliasesService;
+	private ?string $currentUserId;
+	private IUserSession $userSession;
+	private IUserPreferences $preferences;
+	private IMailManager $mailManager;
+	private TagMapper $tagMapper;
+	private IInitialState $initialStateService;
+	private LoggerInterface $logger;
+	private OutboxService $outboxService;
+	private IEventDispatcher $dispatcher;
+	private ICredentialstore $credentialStore;
 
 	public function __construct(string $appName,
 								IRequest $request,
@@ -97,7 +83,9 @@ class PageController extends Controller {
 								TagMapper $tagMapper,
 								IInitialState $initialStateService,
 								LoggerInterface $logger,
-								OutboxService $outboxService) {
+								OutboxService $outboxService,
+								IEventDispatcher $dispatcher,
+								ICredentialStore $credentialStore) {
 		parent::__construct($appName, $request);
 
 		$this->urlGenerator = $urlGenerator;
@@ -112,6 +100,8 @@ class PageController extends Controller {
 		$this->initialStateService = $initialStateService;
 		$this->logger = $logger;
 		$this->outboxService = $outboxService;
+		$this->dispatcher = $dispatcher;
+		$this->credentialStore = $credentialStore;
 	}
 
 	/**
@@ -121,6 +111,10 @@ class PageController extends Controller {
 	 * @return TemplateResponse renders the index page
 	 */
 	public function index(): TemplateResponse {
+		if (class_exists(LoadViewer::class)) {
+			$this->dispatcher->dispatchTyped(new LoadViewer());
+		}
+
 		$this->initialStateService->provideInitialState(
 			'debug',
 			$this->config->getSystemValue('debug', false)
@@ -157,6 +151,17 @@ class PageController extends Controller {
 			$this->tagMapper->getAllTagsForUser($this->currentUserId)
 		);
 
+		try {
+			$password = $this->credentialStore->getLoginCredentials()->getPassword();
+			$passwordIsUnavailable = $password === null || $password === '';
+		} catch (CredentialsUnavailableException | PasswordUnavailableException $e) {
+			$passwordIsUnavailable = true;
+		}
+		$this->initialStateService->provideInitialState(
+			'password-is-unavailable',
+			$passwordIsUnavailable,
+		);
+
 		$user = $this->userSession->getUser();
 		$response = new TemplateResponse($this->appName, 'index',
 			[
@@ -165,6 +170,7 @@ class PageController extends Controller {
 				'external-avatars' => $this->preferences->getPreference($this->currentUserId, 'external-avatars', 'true'),
 				'reply-mode' => $this->preferences->getPreference($this->currentUserId, 'reply-mode', 'top'),
 				'collect-data' => $this->preferences->getPreference($this->currentUserId, 'collect-data', 'true'),
+				'start-mailbox-id' => $this->preferences->getPreference($this->currentUserId, 'start-mailbox-id'),
 				'tag-classified-messages' => $this->preferences->getPreference($this->currentUserId, 'tag-classified-messages', 'true'),
 			]);
 		$this->initialStateService->provideInitialState(
@@ -180,12 +186,33 @@ class PageController extends Controller {
 			'outbox-messages',
 			$this->outboxService->getMessages($user->getUID())
 		);
+		$clientId = $this->config->getAppValue(Application::APP_ID, 'google_oauth_client_id');
+		if (!empty($clientId)) {
+			$this->initialStateService->provideInitialState(
+				'google-oauth-url',
+				'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query([
+					'client_id' => $clientId,
+					'redirect_uri' => $this->urlGenerator->linkToRouteAbsolute('mail.googleIntegration.oauthRedirect'),
+					'response_type' => 'code',
+					'prompt' => 'consent',
+					'state' => '_accountId_', // Replaced by frontend
+					'scope' => 'https://mail.google.com/',
+					'access_type' => 'offline',
+					'login_hint' => '_email_', // Replaced by frontend
+				]),
+			);
+		}
 
 		// Disable scheduled send in frontend if ajax cron is used because it is unreliable
 		$cronMode = $this->config->getAppValue('core', 'backgroundjobs_mode', 'ajax');
 		$this->initialStateService->provideInitialState(
 			'disable-scheduled-send',
 			$cronMode === 'ajax',
+		);
+
+		$this->initialStateService->provideInitialState(
+			'allow-new-accounts',
+			$this->config->getAppValue('mail', 'allow_new_mail_accounts', 'yes') === 'yes'
 		);
 
 		$csp = new ContentSecurityPolicy();

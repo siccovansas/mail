@@ -5,6 +5,7 @@ declare(strict_types=1);
 /**
  * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Lukas Reschke <lukas@owncloud.com>
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
  *
  * Mail
  *
@@ -24,6 +25,9 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Tests\Unit\Controller;
 
+use Horde_Imap_Client_Socket;
+use OCA\Mail\IMAP\IMAPClientFactory;
+use OCA\Mail\Service\SMimeService;
 use OCP\IL10N;
 use OCP\IRequest;
 use OCA\Mail\Db\Tag;
@@ -61,7 +65,6 @@ use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OC\Security\CSP\ContentSecurityPolicyNonceManager;
 
 class MessagesControllerTest extends TestCase {
-
 	/** @var string */
 	private $appName;
 
@@ -125,6 +128,12 @@ class MessagesControllerTest extends TestCase {
 	/** @var ITimeFactory */
 	private $oldFactory;
 
+	/** @var MockObject|SMimeService */
+	private $sMimeService;
+
+	/** @var MockObject|IMAPClientFactory  */
+	private $clientFactory;
+
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -144,6 +153,8 @@ class MessagesControllerTest extends TestCase {
 		$this->nonceManager = $this->createMock(ContentSecurityPolicyNonceManager::class);
 		$this->trustedSenderService = $this->createMock(ITrustedSenderService::class);
 		$this->mailTransmission = $this->createMock(IMailTransmission::class);
+		$this->sMimeService = $this->createMock(SMimeService::class);
+		$this->clientFactory = $this->createMock(IMAPClientFactory::class);
 
 		$timeFactory = $this->createMocK(ITimeFactory::class);
 		$timeFactory->expects($this->any())
@@ -169,7 +180,9 @@ class MessagesControllerTest extends TestCase {
 			$this->urlGenerator,
 			$this->nonceManager,
 			$this->trustedSenderService,
-			$this->mailTransmission
+			$this->mailTransmission,
+			$this->sMimeService,
+			$this->clientFactory,
 		);
 
 		$this->account = $this->createMock(Account::class);
@@ -185,7 +198,7 @@ class MessagesControllerTest extends TestCase {
 		\OC::$server->offsetSet(ITimeFactory::class, $this->oldFactory);
 	}
 
-	public function testGetHtmlBody() {
+	public function testGetHtmlBody(): void {
 		$accountId = 17;
 		$mailboxId = 13;
 		$folderId = 'testfolder';
@@ -211,11 +224,16 @@ class MessagesControllerTest extends TestCase {
 			->method('find')
 			->with($this->equalTo($this->userId), $this->equalTo($accountId))
 			->will($this->returnValue($this->account));
+		$client = $this->createMock(Horde_Imap_Client_Socket::class);
 		$imapMessage = $this->createMock(IMAPMessage::class);
 		$this->mailManager->expects($this->exactly(2))
 			->method('getImapMessage')
-			->with($this->account, $mailbox, 123, true)
+			->with($client, $this->account, $mailbox, 123, true)
 			->willReturn($imapMessage);
+		$this->clientFactory->expects($this->exactly(2))
+			->method('getClient')
+			->with($this->account)
+			->willReturn($client);
 
 		$expectedPlainResponse = HtmlResponse::plain('');
 		$expectedPlainResponse->cacheFor(3600);
@@ -244,7 +262,9 @@ class MessagesControllerTest extends TestCase {
 		$policy->disallowFontDomain('\'self\'');
 		$policy->disallowMediaDomain('\'self\'');
 		$expectedPlainResponse->setContentSecurityPolicy($policy);
+		$expectedPlainResponse->cacheFor(60 * 60, false, true);
 		$expectedRichResponse->setContentSecurityPolicy($policy);
+		$expectedRichResponse->cacheFor(60 * 60, false, true);
 
 		$actualPlainResponse = $this->controller->getHtmlBody($messageId, true);
 		$actualRichResponse = $this->controller->getHtmlBody($messageId, false);
@@ -1068,5 +1088,52 @@ class MessagesControllerTest extends TestCase {
 			->method('getThread');
 
 		$this->controller->getThread($id);
+	}
+
+	public function testExport() {
+		$accountId = 17;
+		$mailboxId = 13;
+		$folderId = 'testfolder';
+		$messageId = 4321;
+		$this->account
+			->method('getId')
+			->willReturn($accountId);
+		$mailbox = new \OCA\Mail\Db\Mailbox();
+		$message = new \OCA\Mail\Db\Message();
+		$message->setMailboxId($mailboxId);
+		$message->setUid(123);
+		$message->setSubject('core/master has new results');
+		$mailbox->setAccountId($accountId);
+		$mailbox->setName($folderId);
+		$this->mailManager->expects($this->exactly(1))
+			->method('getMessage')
+			->with($this->userId, $messageId)
+			->willReturn($message);
+		$this->mailManager->expects($this->exactly(1))
+			->method('getMailbox')
+			->with($this->userId, $mailboxId)
+			->willReturn($mailbox);
+		$this->accountService->expects($this->exactly(1))
+			->method('find')
+			->with($this->equalTo($this->userId), $this->equalTo($accountId))
+			->will($this->returnValue($this->account));
+		$source = file_get_contents(__DIR__ . '/../../data/mail-message-123.txt');
+		$client = $this->createMock(Horde_Imap_Client_Socket::class);
+		$this->mailManager->expects($this->exactly(1))
+			->method('getSource')
+			->with($client, $this->account, $folderId, 123)
+			->willReturn($source);
+		$this->clientFactory->expects($this->once())
+			->method('getClient')
+			->willReturn($client);
+
+		$expectedResponse = new AttachmentDownloadResponse(
+			$source,
+			'core/master has new results.eml',
+			'message/rfc822'
+		);
+		$actualResponse = $this->controller->export($messageId);
+
+		$this->assertEquals($expectedResponse, $actualResponse);
 	}
 }

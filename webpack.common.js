@@ -25,6 +25,7 @@ module.exports = {
 		autoredirect: path.join(__dirname, 'src/autoredirect.js'),
 		dashboard: path.join(__dirname, 'src/main-dashboard.js'),
 		mail: path.join(__dirname, 'src/main.js'),
+		oauthpopup: path.join(__dirname, 'src/main-oauth-popup.js'),
 		settings: path.join(__dirname, 'src/main-settings'),
 		htmlresponse: path.join(__dirname, 'src/html-response.js'),
 	},
@@ -32,9 +33,6 @@ module.exports = {
 		path: path.resolve(__dirname, 'js'),
 		chunkFilename: 'mail.[name].[contenthash].js',
 		publicPath: '/js/',
-	},
-	node: {
-		fs: 'empty',
 	},
 	module: {
 		rules: [
@@ -102,5 +100,10 @@ module.exports = {
 	resolve: {
 		extensions: ['*', '.js', '.vue', '.json'],
 		symlinks: false,
+		fallback: {
+			buffer: require.resolve('buffer/'),
+			stream: require.resolve('stream-browserify'),
+			util: require.resolve('util/'),
+		},
 	},
 }

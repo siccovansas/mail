@@ -36,7 +36,6 @@ use OCP\BackgroundJob\IJobList;
 use function array_map;
 
 class AccountService {
-
 	/** @var MailAccountMapper */
 	private $mapper;
 
@@ -151,6 +150,10 @@ class AccountService {
 		$this->jobList->add(TrainImportanceClassifierJob::class, ['accountId' => $newAccount->getId()]);
 
 		return $newAccount;
+	}
+
+	public function update(MailAccount $account): MailAccount {
+		return $this->mapper->update($account);
 	}
 
 	/**

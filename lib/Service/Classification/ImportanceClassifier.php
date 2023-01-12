@@ -65,7 +65,6 @@ use function json_encode;
  * as important.
  */
 class ImportanceClassifier {
-
 	/**
 	 * Mailbox special uses to exclude from the training
 	 */
@@ -291,13 +290,12 @@ class ImportanceClassifier {
 
 	/**
 	 * @param Account $account
-	 * @param Mailbox $mailbox
 	 * @param Message[] $messages
 	 *
 	 * @return bool[]
 	 * @throws ServiceException
 	 */
-	public function classifyImportance(Account $account, Mailbox $mailbox, array $messages): array {
+	public function classifyImportance(Account $account, array $messages): array {
 		$estimator = $this->persistenceService->loadLatest($account);
 		if ($estimator === null) {
 			$predictions = $this->rulesClassifier->classifyImportance(

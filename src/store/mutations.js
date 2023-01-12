@@ -82,8 +82,9 @@ const sortAccounts = (accounts) => {
 
 /**
  * Convert envelope tag objects to references and add new tags to global list.
- * @param {Object} state vuex state
- * @param {Object} envelope envelope with tag objects
+ *
+ * @param {object} state vuex state
+ * @param {object} envelope envelope with tag objects
  */
 const normalizeTags = (state, envelope) => {
 	if (Array.isArray(envelope.tags)) {
@@ -112,10 +113,10 @@ const normalizeTags = (state, envelope) => {
  * If the given thread root id exist the message is replaced
  * otherwise appended
  *
- * @param {Object} state vuex state
+ * @param {object} state vuex state
  * @param {Array} existing list of envelope ids for a message list
- * @param {Object} envelope envelope with tag objects
- * @returns {Array} list of envelope ids
+ * @param {object} envelope envelope with tag objects
+ * @return {Array} list of envelope ids
  */
 const appendOrReplaceEnvelopeId = (state, existing, envelope) => {
 	const index = existing.findIndex((id) => state.envelopes[id].threadRootId === envelope.threadRootId)
@@ -130,6 +131,9 @@ const appendOrReplaceEnvelopeId = (state, existing, envelope) => {
 export default {
 	savePreference(state, { key, value }) {
 		Vue.set(state.preferences, key, value)
+	},
+	setSessionExpired(state) {
+		Vue.set(state, 'isExpiredSession', true)
 	},
 	addAccount(state, account) {
 		account.collapsed = account.collapsed ?? true
@@ -344,6 +348,9 @@ export default {
 
 		Vue.delete(state.envelopes, id)
 	},
+	removeEnvelopes(state, { id }) {
+		Vue.set(state.mailboxes[id], 'envelopeLists', [])
+	},
 	addMessage(state, { message }) {
 		Vue.set(state.messages, message.databaseId, message)
 	},
@@ -389,5 +396,17 @@ export default {
 	},
 	setScheduledSendingDisabled(state, value) {
 		state.isScheduledSendingDisabled = value
+	},
+	setActiveSieveScript(state, { accountId, scriptData }) {
+		Vue.set(state.sieveScript, accountId, scriptData)
+	},
+	setCurrentUserPrincipal(state, { currentUserPrincipal }) {
+		state.currentUserPrincipal = currentUserPrincipal
+	},
+	addCalendar(state, { calendar }) {
+		state.calendars = [...state.calendars, calendar]
+	},
+	setGoogleOauthUrl(state, url) {
+		state.googleOauthUrl = url
 	},
 }

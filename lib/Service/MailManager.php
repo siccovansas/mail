@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /**
  * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
  *
  * Mail
  *
@@ -26,6 +27,7 @@ namespace OCA\Mail\Service;
 use Horde_Imap_Client;
 use Horde_Imap_Client_Exception;
 use Horde_Imap_Client_Exception_NoSupportExtension;
+use Horde_Imap_Client_Ids;
 use Horde_Imap_Client_Socket;
 use OCA\Mail\Account;
 use OCA\Mail\Contracts\IMailManager;
@@ -55,7 +57,6 @@ use function array_map;
 use function array_values;
 
 class MailManager implements IMailManager {
-
 	/**
 	 * https://tools.ietf.org/html/rfc3501#section-2.3.2
 	 */
@@ -156,9 +157,8 @@ class MailManager implements IMailManager {
 			$this->folderMapper->getFoldersStatus([$folder], $client);
 		} catch (Horde_Imap_Client_Exception $e) {
 			throw new ServiceException(
-				"Could not get mailbox status: " .
-				$e->getMessage(),
-				(int)$e->getCode(),
+				"Could not get mailbox status: " . $e->getMessage(),
+				$e->getCode(),
 				$e
 			);
 		} finally {
@@ -171,11 +171,22 @@ class MailManager implements IMailManager {
 		return $this->mailboxMapper->find($account, $name);
 	}
 
-	public function getImapMessage(Account $account,
+	/**
+	 * @param Horde_Imap_Client_Socket $client
+	 * @param Account $account
+	 * @param Mailbox $mailbox
+	 * @param int $uid
+	 * @param bool $loadBody
+	 *
+	 * @return IMAPMessage
+	 *
+	 * @throws ServiceException
+	 */
+	public function getImapMessage(Horde_Imap_Client_Socket $client,
+								   Account $account,
 								   Mailbox $mailbox,
 								   int $uid,
 								   bool $loadBody = false): IMAPMessage {
-		$client = $this->imapClientFactory->getClient($account);
 		try {
 			return $this->imapMessageMapper->find(
 				$client,
@@ -186,7 +197,34 @@ class MailManager implements IMailManager {
 		} catch (Horde_Imap_Client_Exception | DoesNotExistException $e) {
 			throw new ServiceException(
 				"Could not load message",
-				(int)$e->getCode(),
+				$e->getCode(),
+				$e
+			);
+		}
+	}
+
+	/**
+	 * @param Account $account
+	 * @param Mailbox $mailbox
+	 * @param int[] $uids
+	 * @return IMAPMessage[]
+	 * @throws ServiceException
+	 */
+	public function getImapMessagesForScheduleProcessing(Account $account,
+		Mailbox $mailbox,
+		array $uids): array {
+		$client = $this->imapClientFactory->getClient($account);
+		try {
+			return $this->imapMessageMapper->findByIds(
+				$client,
+				$mailbox->getName(),
+				new Horde_Imap_Client_Ids($uids),
+				true
+			);
+		} catch (Horde_Imap_Client_Exception $e) {
+			throw new ServiceException(
+				'Could not load messages: ' . $e->getMessage(),
+				$e->getCode(),
 				$e
 			);
 		} finally {
@@ -207,17 +245,19 @@ class MailManager implements IMailManager {
 	}
 
 	/**
+	 * @param Horde_Imap_Client_Socket $client
 	 * @param Account $account
 	 * @param string $mailbox
 	 * @param int $uid
 	 *
 	 * @return string
 	 *
-	 * @throws ClientException
 	 * @throws ServiceException
 	 */
-	public function getSource(Account $account, string $mailbox, int $uid): ?string {
-		$client = $this->imapClientFactory->getClient($account);
+	public function getSource(Horde_Imap_Client_Socket $client,
+							  Account $account,
+							  string $mailbox,
+							  int $uid): ?string {
 		try {
 			return $this->imapMessageMapper->getFullText(
 				$client,
@@ -226,8 +266,6 @@ class MailManager implements IMailManager {
 			);
 		} catch (Horde_Imap_Client_Exception | DoesNotExistException $e) {
 			throw new ServiceException("Could not load message", 0, $e);
-		} finally {
-			$client->logout();
 		}
 	}
 
@@ -367,7 +405,7 @@ class MailManager implements IMailManager {
 		} catch (Horde_Imap_Client_Exception $e) {
 			throw new ServiceException(
 				"Could not set subscription status for mailbox " . $mailbox->getId() . " on IMAP: " . $e->getMessage(),
-				(int)$e->getCode(),
+				$e->getCode(),
 				$e
 			);
 		} finally {
@@ -416,7 +454,7 @@ class MailManager implements IMailManager {
 		} catch (Horde_Imap_Client_Exception $e) {
 			throw new ServiceException(
 				"Could not set message flag on IMAP: " . $e->getMessage(),
-				(int)$e->getCode(),
+				$e->getCode(),
 				$e
 			);
 		} finally {
@@ -469,7 +507,7 @@ class MailManager implements IMailManager {
 			} catch (Horde_Imap_Client_Exception $e) {
 				throw new ServiceException(
 					"Could not set message keyword on IMAP: " . $e->getMessage(),
-					(int)$e->getCode(),
+					$e->getCode(),
 					$e
 				);
 			} finally {
@@ -493,7 +531,6 @@ class MailManager implements IMailManager {
 	 * @see https://tools.ietf.org/html/rfc2087
 	 */
 	public function getQuota(Account $account): ?Quota {
-
 		/**
 		 * Get all the quotas roots of the user's mailboxes
 		 */
@@ -586,6 +623,39 @@ class MailManager implements IMailManager {
 	}
 
 	/**
+	 * Clear messages in folder
+	 *
+	 * @param Account $account
+	 * @param Mailbox $mailbox
+	 *
+	 * @throws DoesNotExistException
+	 * @throws Horde_Imap_Client_Exception
+	 * @throws Horde_Imap_Client_Exception_NoSupportExtension
+	 * @throws ServiceException
+	 */
+	public function clearMailbox(Account $account,
+								  Mailbox $mailbox): void {
+		$client = $this->imapClientFactory->getClient($account);
+		$trashMailboxId = $account->getMailAccount()->getTrashMailboxId();
+		$currentMailboxId = $mailbox->getId();
+		try {
+			if (($currentMailboxId !== $trashMailboxId) && !is_null($trashMailboxId)) {
+				$trash = $this->mailboxMapper->findById($trashMailboxId);
+				$client->copy($mailbox->getName(), $trash->getName(), [
+					'move' => true
+				]);
+			} else {
+				$client->expunge($mailbox->getName(), [
+					'delete' => true
+				]);
+			}
+			$this->dbMessageMapper->deleteAll($mailbox);
+		} finally {
+			$client->logout();
+		}
+	}
+
+	/**
 	 * @param Account $account
 	 * @param Mailbox $mailbox
 	 * @param Message $message
@@ -648,7 +718,7 @@ class MailManager implements IMailManager {
 		} catch (Horde_Imap_Client_Exception $e) {
 			throw new ServiceException(
 				"Could not get message flag options from IMAP: " . $e->getMessage(),
-				(int)$e->getCode(),
+				$e->getCode(),
 				$e
 			);
 		}

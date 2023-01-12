@@ -38,7 +38,6 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
 class MailboxesControllerTest extends TestCase {
-
 	/** @var string */
 	private $appName = 'mail';
 
@@ -136,10 +135,11 @@ class MailboxesControllerTest extends TestCase {
 		$this->assertEquals($expected, $response);
 	}
 
-	public function testStats() {
+	public function testStats(): void {
 		$mailbox = new Mailbox();
 		$mailbox->setUnseen(10);
 		$mailbox->setMessages(42);
+		$mailbox->setMyAcls(null);
 		$this->mailManager->expects($this->once())
 			->method('getMailbox')
 			->with('john', 13)
@@ -147,7 +147,7 @@ class MailboxesControllerTest extends TestCase {
 
 		$response = $this->controller->stats(13);
 
-		$stats = new MailboxStats(42, 10);
+		$stats = new MailboxStats(42, 10, null);
 		$expected = new JSONResponse($stats);
 		$this->assertEquals($expected, $response);
 	}

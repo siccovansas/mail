@@ -44,7 +44,6 @@ use function array_diff;
 use function array_map;
 
 class SyncService {
-
 	/** @var ImapToDbSynchronizer */
 	private $synchronizer;
 
@@ -163,7 +162,7 @@ class SyncService {
 			$newUids = $this->messageMapper->findUidsForIds($mailbox, $newIds);
 			$newIds = $this->messageMapper->findIdsByQuery($mailbox, $query, null, $newUids);
 		}
-		$new = $this->messageMapper->findByIds($account->getUserId(), $newIds);
+		$new = $this->messageMapper->findByMailboxAndIds($mailbox, $account->getUserId(), $newIds);
 
 		// TODO: $changed = $this->messageMapper->findChanged($account, $mailbox, $uids);
 		if ($query !== null) {
@@ -172,7 +171,7 @@ class SyncService {
 		} else {
 			$changedIds = $knownIds;
 		}
-		$changed = $this->messageMapper->findByIds($account->getUserId(), $changedIds);
+		$changed = $this->messageMapper->findByMailboxAndIds($mailbox, $account->getUserId(), $changedIds);
 
 		$stillKnownIds = array_map(static function (Message $msg) {
 			return $msg->getId();

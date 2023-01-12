@@ -178,10 +178,6 @@
 			</div>
 		</transition>
 		<transition-group name="list">
-			<div id="list-refreshing"
-				key="loading"
-				class="icon-loading-small"
-				:class="{refreshing: refreshing}" />
 			<Envelope
 				v-for="(env, index) in envelopes"
 				:key="env.databaseId"
@@ -192,13 +188,14 @@
 				:has-multiple-accounts="hasMultipleAccounts"
 				:selected-envelopes="selectedEnvelopes"
 				@delete="$emit('delete', env.databaseId)"
-				@update:selected="onEnvelopeSelectToggle(env, index, ...$event)"
+				@update:selected="onEnvelopeSelectToggle(env, index, $event)"
 				@select-multiple="onEnvelopeSelectMultiple(env, index)" />
 			<div
 				v-if="loadMoreButton && !loadingMore"
 				:key="'list-collapse-' + searchQuery"
 				class="load-more"
 				@click="$emit('load-more')">
+				<AddIcon :size="20" />
 				{{ t('mail', 'Load more') }}
 			</div>
 			<div id="load-more-mail-messages" key="loadingMore" :class="{'icon-loading-small': loadingMore}" />
@@ -207,13 +204,13 @@
 </template>
 
 <script>
-import Actions from '@nextcloud/vue/dist/Components/Actions'
-import ActionButton from '@nextcloud/vue/dist/Components/ActionButton'
+import { NcActions as Actions, NcActionButton as ActionButton } from '@nextcloud/vue'
 import { showError } from '@nextcloud/dialogs'
 import Envelope from './Envelope'
 import IconDelete from 'vue-material-design-icons/Delete'
 import ImportantIcon from './icons/ImportantIcon'
 import IconSelect from 'vue-material-design-icons/CloseThick'
+import AddIcon from 'vue-material-design-icons/Plus'
 import IconFavorite from 'vue-material-design-icons/Star'
 import logger from '../logger'
 import MoveModal from './MoveModal'
@@ -229,6 +226,7 @@ export default {
 	name: 'EnvelopeList',
 	components: {
 		Actions,
+		AddIcon,
 		ActionButton,
 		Envelope,
 		IconDelete,
@@ -398,7 +396,7 @@ export default {
 				}
 			}
 
-			await Promise.all(this.selectedEnvelopes.map(async(envelope) => {
+			await Promise.all(this.selectedEnvelopes.map(async (envelope) => {
 				logger.info(`deleting thread ${envelope.threadRootId}`)
 				await this.$store.dispatch('deleteThread', {
 					envelope,
@@ -500,6 +498,11 @@ div {
 	margin-top: 10px;
 	cursor: pointer;
 	color: var(--color-text-maxcontrast);
+	display: inline-flex;
+	gap: 15px;
+}
+.plus-icon {
+	margin-left: 20px;
 }
 
 .multiselect-header {
@@ -522,30 +525,9 @@ div {
 }
 
 /* TODO: put this in core icons.css as general rule for buttons with icons */
-#load-more-mail-messages.icon-loading-small {
+#load-more-mail-messages {
 	padding-left: 32px;
 	background-position: 9px center;
-}
-
-#list-refreshing {
-	position: absolute;
-	left: calc(50% - 8px);
-	overflow: hidden;
-	padding: 12px;
-	background-color: var(--color-main-background);
-	z-index: 1;
-	border-radius: var(--border-radius-pill);
-	border: 1px solid var(--color-border);
-	top: -24px;
-	opacity: 0;
-	transition-property: top, opacity;
-	transition-duration: 0.5s;
-	transition-timing-function: ease-in-out;
-
-	&.refreshing {
-		top: 4px;
-		opacity: 1;
-	}
 }
 
 .multiselect-header-enter-active,

@@ -42,7 +42,7 @@ export const update = (data) => {
 
 	return axios
 		.put(url, data)
-		.then((resp) => resp.data)
+		.then((resp) => resp.data.data)
 		.then(fixAccountId)
 		.catch((e) => {
 			if (e.response && e.response.status === 400) {
@@ -81,7 +81,7 @@ export const fetch = (id) => {
 	return axios.get(url).then((resp) => fixAccountId(resp.data))
 }
 
-export const fetchQuota = async(id) => {
+export const fetchQuota = async (id) => {
 	const url = generateUrl('/apps/mail/api/accounts/{id}/quota', {
 		id,
 	})

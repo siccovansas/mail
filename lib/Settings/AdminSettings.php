@@ -26,15 +26,16 @@ declare(strict_types=1);
 namespace OCA\Mail\Settings;
 
 use OCA\Mail\AppInfo\Application;
+use OCA\Mail\Integration\GoogleIntegration;
 use OCA\Mail\Service\AntiSpamService;
 use OCA\Mail\Service\Provisioning\Manager as ProvisioningManager;
 use OCP\AppFramework\Http\TemplateResponse;
+use OCP\IConfig;
 use OCP\IInitialStateService;
 use OCP\LDAP\ILDAPProvider;
 use OCP\Settings\ISettings;
 
 class AdminSettings implements ISettings {
-
 	/** @var IInitialStateService */
 	private $initialStateService;
 
@@ -44,12 +45,19 @@ class AdminSettings implements ISettings {
 	/** @var AntiSpamService */
 	private $antiSpamService;
 
+	private GoogleIntegration $googleIntegration;
+	private IConfig $config;
+
 	public function __construct(IInitialStateService $initialStateService,
 								ProvisioningManager $provisioningManager,
-								AntiSpamService $antiSpamService) {
+								AntiSpamService $antiSpamService,
+								GoogleIntegration $googleIntegration,
+								IConfig $config) {
 		$this->initialStateService = $initialStateService;
 		$this->provisioningManager = $provisioningManager;
 		$this->antiSpamService = $antiSpamService;
+		$this->googleIntegration = $googleIntegration;
+		$this->config = $config;
 	}
 
 	public function getForm() {
@@ -68,13 +76,28 @@ class AdminSettings implements ISettings {
 			]
 		);
 
-
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'allow_new_mail_accounts',
+			$this->config->getAppValue('mail', 'allow_new_mail_accounts', 'yes') === 'yes'
+		);
 		$this->initialStateService->provideLazyInitialState(
 			Application::APP_ID,
 			'ldap_aliases_integration',
 			function () {
 				return method_exists(ILDAPProvider::class, 'getMultiValueUserAttribute');
 			}
+		);
+
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'google_oauth_client_id',
+			$this->googleIntegration->getClientId(),
+		);
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'google_oauth_redirect_url',
+			$this->googleIntegration->getRedirectUrl(),
 		);
 
 		return new TemplateResponse(Application::APP_ID, 'settings-admin');

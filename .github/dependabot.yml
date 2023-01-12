@@ -9,6 +9,12 @@ updates:
     time: "03:00"
     timezone: Europe/Paris
   open-pull-requests-limit: 10
+  reviewers:
+  - "ChristophWurst"
+  - "kesselb"
+  commit-message:
+    prefix: ci
+    include: scope
 - package-ecosystem: npm
   directory: "/"
   schedule:
@@ -20,11 +26,12 @@ updates:
   labels:
   - 3. to review
   - dependencies
-  ignore:
-  - dependency-name: backbone.marionette
-    versions:
-    - "< 5"
-    - ">= 4.a"
+  reviewers:
+  - "ChristophWurst"
+  - "GretaD"
+  commit-message:
+    prefix: chore
+    include: scope
 - package-ecosystem: composer
   directory: "/"
   schedule:
@@ -40,6 +47,12 @@ updates:
   allow:
   - dependency-type: direct
   - dependency-type: indirect
+  reviewers:
+  - "ChristophWurst"
+  - "kesselb"
+  commit-message:
+    prefix: chore
+    include: scope
 - package-ecosystem: composer
   directory: "/vendor-bin/mozart/"
   schedule:
@@ -52,8 +65,12 @@ updates:
       - 3. to review
       - dependencies
       - php
-  allow:
-      - dependency-type: direct
+  reviewers:
+  - "ChristophWurst"
+  - "kesselb"
+  commit-message:
+    prefix: chore
+    include: scope
 - package-ecosystem: composer
   directory: "/vendor-bin/cs-fixer/"
   schedule:
@@ -66,8 +83,12 @@ updates:
       - 3. to review
       - dependencies
       - php
-  allow:
-      - dependency-type: direct
+  reviewers:
+  - "ChristophWurst"
+  - "kesselb"
+  commit-message:
+    prefix: chore
+    include: scope
 - package-ecosystem: composer
   directory: "/vendor-bin/phpunit/"
   schedule:
@@ -80,19 +101,9 @@ updates:
       - 3. to review
       - dependencies
       - php
-  allow:
-      - dependency-type: direct
-
-# Stable1.12
-- package-ecosystem: npm
-  target-branch: stable1.12
-  directory: "/"
-  schedule:
-      interval: "daily"
-  open-pull-requests-limit: 0
-- package-ecosystem: composer
-  target-branch: stable1.12
-  directory: "/"
-  schedule:
-      interval: "daily"
-  open-pull-requests-limit: 0
+  reviewers:
+  - "ChristophWurst"
+  - "kesselb"
+  commit-message:
+    prefix: chore
+    include: scope

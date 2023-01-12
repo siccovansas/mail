@@ -43,7 +43,6 @@ use OCP\Files\NotPermittedException;
 use Psr\Log\LoggerInterface;
 
 class AttachmentService implements IAttachmentService {
-
 	/** @var LocalAttachmentMapper */
 	private $mapper;
 
@@ -124,7 +123,7 @@ class AttachmentService implements IAttachmentService {
 		} catch (NotFoundException|NotPermittedException $e) {
 			// Clean-up
 			$this->mapper->delete($persisted);
-			throw new UploadException($e->getMessage(), (int)$e->getCode(), $e);
+			throw new UploadException($e->getMessage(), $e->getCode(), $e);
 		}
 
 		return $attachment;

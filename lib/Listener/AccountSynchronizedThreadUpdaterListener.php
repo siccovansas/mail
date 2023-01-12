@@ -36,6 +36,9 @@ use OCP\EventDispatcher\IEventListener;
 use function array_chunk;
 use function iterator_to_array;
 
+/**
+ * @template-implements IEventListener<Event|SynchronizationEvent>
+ */
 class AccountSynchronizedThreadUpdaterListener implements IEventListener {
 	private const WRITE_IDS_CHUNK_SIZE = 500;
 
@@ -63,6 +66,7 @@ class AccountSynchronizedThreadUpdaterListener implements IEventListener {
 		}
 
 		$accountId = $event->getAccount()->getId();
+		$logger->debug("Building threads for account $accountId");
 		$messages = $this->mapper->findThreadingData($event->getAccount());
 		$logger->debug("Account $accountId has " . count($messages) . " messages for threading");
 		$threads = $this->builder->build($messages, $logger);

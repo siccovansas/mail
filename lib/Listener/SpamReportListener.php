@@ -31,8 +31,10 @@ use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @template-implements IEventListener<Event|MessageFlaggedEvent>
+ */
 class SpamReportListener implements IEventListener {
-
 	/** @var LoggerInterface */
 	private $logger;
 

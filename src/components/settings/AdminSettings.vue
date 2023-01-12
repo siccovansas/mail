@@ -107,12 +107,18 @@
 			}}
 		</h3>
 		<p>
-			<button class="config-button icon-add" @click="addNew=true">
+			<Button class="config-button" @click="addNew=true">
+				<template #icon>
+					<IconAdd :size="20" />
+				</template>
 				{{ t('mail', 'Add new config') }}
-			</button>
-			<button class="config-button icon-settings" @click="provisionAll">
+			</Button>
+			<Button class="config-button" @click="provisionAll">
+				<template #icon>
+					<IconSettings :size="20" />
+				</template>
 				{{ t('mail', 'Provision all accounts') }}
-			</button>
+			</Button>
 			<ProvisioningSettings v-if="addNew"
 				:key="formKey"
 				:setting="preview"
@@ -125,6 +131,19 @@
 				:submit="saveSettings"
 				:disable="deleteProvisioning" />
 		</p>
+		<div class="app-description">
+			<h3>{{ t('mail', 'Allow additional mail accounts') }}</h3>
+			<article>
+				<p>
+					<NcCheckboxRadioSwitch
+						:checked.sync="allowNewMailAccounts"
+						type="switch"
+						@update:checked="updateAllowNewMailAccounts">
+						{{ t('mail','Allow additional Mail accounts from User Settings') }}
+					</NcCheckboxRadioSwitch>
+				</p>
+			</article>
+		</div>
 		<div class="app-description">
 			<h3>
 				{{
@@ -153,28 +172,76 @@
 			</article>
 			<AntiSpamSettings />
 		</div>
+		<div class="app-description">
+			<h3>
+				{{
+					t(
+						'mail',
+						'Gmail integration'
+					)
+				}}
+			</h3>
+			<article>
+				<p>
+					{{
+						t(
+							'mail',
+							'Gmail allows users to access their email via IMAP. For security reasons this access is only possible with an OAuth 2.0 connection or Google accounts that use two-factor authentication and app passwords.'
+						)
+					}}
+				</p>
+				<p>
+					{{
+						t(
+							'mail',
+							'You have to register a new Client ID for a "Web application" in the Google Cloud console. Add the URL {url} as authorized redirect URI.',
+							{
+								url: googleOauthRedirectUrl,
+							}
+						)
+					}}
+				</p>
+			</article>
+			<GmailAdminOauthSettings :client-id="googleOauthClientId" />
+		</div>
 	</SettingsSection>
 </template>
 
 <script>
+import Button from '@nextcloud/vue/dist/Components/NcButton'
+import GmailAdminOauthSettings from './GmailAdminOauthSettings'
 import logger from '../../logger'
 import { showError, showSuccess } from '@nextcloud/dialogs'
+import { loadState } from '@nextcloud/initial-state'
 import ProvisioningSettings from './ProvisioningSettings'
 import AntiSpamSettings from './AntiSpamSettings'
-import SettingsSection from '@nextcloud/vue/dist/Components/SettingsSection'
+import IconAdd from 'vue-material-design-icons/Plus'
+import IconSettings from 'vue-material-design-icons/Cog'
+import SettingsSection from '@nextcloud/vue/dist/Components/NcSettingsSection'
+import NcCheckboxRadioSwitch from '@nextcloud/vue/dist/Components/NcCheckboxRadioSwitch'
 import {
 	disableProvisioning,
 	createProvisioningSettings,
 	updateProvisioningSettings,
 	provisionAll,
+	updateAllowNewMailAccounts,
 
 } from '../../service/SettingsService'
+
+const googleOauthClientId = loadState('mail', 'google_oauth_client_id', null) ?? undefined
+const googleOauthRedirectUrl = loadState('mail', 'google_oauth_redirect_url', null)
+
 export default {
 	name: 'AdminSettings',
 	components: {
+		GmailAdminOauthSettings,
 		AntiSpamSettings,
 		ProvisioningSettings,
 		SettingsSection,
+		Button,
+		IconAdd,
+		IconSettings,
+		NcCheckboxRadioSwitch,
 	},
 	props: {
 		provisioningSettings: {
@@ -187,6 +254,8 @@ export default {
 			addNew: false,
 			formKey: Math.random(),
 			configs: this.provisioningSettings,
+			googleOauthClientId,
+			googleOauthRedirectUrl,
 			preview: {
 				provisioningDomain: '',
 				emailTemplate: '',
@@ -208,6 +277,7 @@ export default {
 				},
 				loading: false,
 			},
+			allowNewMailAccounts: loadState('mail', 'allow_new_mail_accounts', true),
 		}
 	},
 	methods: {
@@ -231,7 +301,6 @@ export default {
 				showError(t('mail', 'Could not save provisioning setting'))
 				logger.error('Could not save provisioning setting', { error })
 			}
-
 		},
 		resetForm() {
 			this.formKey = Math.random()
@@ -258,18 +327,18 @@ export default {
 				logger.error('Could not delete provisioning config', { error })
 			}
 		},
+		async updateAllowNewMailAccounts(checked) {
+			await updateAllowNewMailAccounts(checked)
+		},
 	},
 }
 </script>
 <style lang="scss" scoped>
-	.app-description {
+.app-description {
 		margin-bottom: 24px;
 	}
-	.config-button {
-		line-height: 24px;
-		padding-left: 48px;
-		padding-top: 6px;
-		padding-bottom: 6px;
-		background-position: 24px;
-	}
+.config-button {
+	display: inline-block;
+	margin-inline: 4px;
+}
 </style>
