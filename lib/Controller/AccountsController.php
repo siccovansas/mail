@@ -241,7 +241,9 @@ class AccountsController extends Controller {
 								 int $sentMailboxId = null,
 								 int $trashMailboxId = null,
 								 int $archiveMailboxId = null,
-								 bool $signatureAboveQuote = null): JSONResponse {
+								 bool $signatureAboveQuote = null,
+	int $junkMailboxId = null,
+	bool $moveJunkToMailbox = null): JSONResponse {
 		$account = $this->accountService->find($this->currentUserId, $id);
 
 		$dbAccount = $account->getMailAccount();
@@ -273,6 +275,13 @@ class AccountsController extends Controller {
 		}
 		if ($signatureAboveQuote !== null) {
 			$dbAccount->setSignatureAboveQuote($signatureAboveQuote);
+		}
+		if ($junkMailboxId !== null) {
+			$this->mailManager->getMailbox($this->currentUserId, $junkMailboxId);
+			$dbAccount->setJunkMailboxId($junkMailboxId);
+		}
+		if ($moveJunkToMailbox !== null) {
+			$dbAccount->setMoveJunkToMailbox($moveJunkToMailbox);
 		}
 		return new JSONResponse(
 			$this->accountService->save($dbAccount)

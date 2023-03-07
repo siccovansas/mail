@@ -74,6 +74,9 @@
 					:account="account" />
 			</div>
 		</AppSettingsSection>
+		<AppSettingsSection id="junk-settings" :title="t('mail', 'Junk settings')">
+			<JunkSettings :account="account" />
+		</AppSettingsSection>
 		<AppSettingsSection id="trusted-sender" :title="t('mail', 'Trusted senders')">
 			<TrustedSenders />
 		</AppSettingsSection>
@@ -113,6 +116,7 @@ import TrustedSenders from './TrustedSenders'
 import SieveAccountForm from './SieveAccountForm'
 import SieveFilterForm from './SieveFilterForm'
 import OutOfOfficeForm from './OutOfOfficeForm'
+import JunkSettings from './JunkSettings'
 
 export default {
 	name: 'AccountSettings',
@@ -128,6 +132,7 @@ export default {
 		AppSettingsSection,
 		AccountDefaultsSettings,
 		OutOfOfficeForm,
+		JunkSettings,
 	},
 	props: {
 		account: {

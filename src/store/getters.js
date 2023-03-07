@@ -131,4 +131,8 @@ export const getters = {
 	getSmimeCertificate: (state) => (id) => state.smimeCertificates.find((cert) => cert.id === id),
 	getSmimeCertificateByEmail: (state) => (email) => state.smimeCertificates.find((cert) => cert.emailAddress === email),
 	getNcVersion: (state) => state.preferences?.ncVersion,
+	findMailboxBySpecialRole: (state, getters) => (accountId, specialRole) => {
+		const mailboxes = getters.getMailboxes(accountId)
+		return mailboxes.find(mailbox => mailbox.specialRole === specialRole)
+	},
 }

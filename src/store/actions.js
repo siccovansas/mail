@@ -947,6 +947,27 @@ export default {
 
 				throw error
 			}
+
+			// todo: find a better place for move code
+			// todo: trigger sync for destination mailbox
+			// todo: add a markAsJunk method for the backend as the 3 xhr request for $junk, $notjunk and move are slow.
+
+			const account = getters.getAccount(envelope.accountId)
+			const moveJunkToMailbox = account.moveJunkToMailbox
+			const junkMailboxId = account.junkMailboxId
+			const inbox = getters.findMailboxBySpecialRole(account.id, 'inbox')
+
+			if (moveJunkToMailbox) {
+				if (oldState === false && junkMailboxId && envelope.mailboxId !== junkMailboxId) {
+					await moveMessage(envelope.databaseId, junkMailboxId)
+					commit('removeEnvelope', { id: envelope.databaseId })
+					commit('removeMessage', { id: envelope.databaseId })
+				} else if (inbox.databaseId && envelope.mailboxId !== inbox.databaseId) {
+					await moveMessage(envelope.databaseId, inbox.databaseId)
+					commit('removeEnvelope', { id: envelope.databaseId })
+					commit('removeMessage', { id: envelope.databaseId })
+				}
+			}
 		})
 	},
 	async markEnvelopeFavoriteOrUnfavorite({ commit, getters }, { envelope, favFlag }) {

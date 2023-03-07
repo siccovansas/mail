@@ -106,6 +106,10 @@ use OCP\AppFramework\Db\Entity;
  * @method void setOauthTokenTtl(int $ttl)
  * @method int|null getSmimeCertificateId()
  * @method void setSmimeCertificateId(int|null $smimeCertificateId)
+ * @method int|null getJunkMailboxId()
+ * @method void setJunkMailboxId(?int $id)
+ * @method bool isMoveJunkToMailbox()
+ * @method void setMoveJunkToMailbox(bool $moveJunkToMailbox)
  */
 class MailAccount extends Entity {
 	public const SIGNATURE_MODE_PLAIN = 0;
@@ -170,6 +174,9 @@ class MailAccount extends Entity {
 
 	/** @var int|null */
 	protected $smimeCertificateId;
+
+	protected ?int $junkMailboxId = null;
+	protected bool $moveJunkToMailbox = false;
 
 	/**
 	 * @param array $params
@@ -239,6 +246,8 @@ class MailAccount extends Entity {
 		$this->addType('signatureAboveQuote', 'boolean');
 		$this->addType('signatureMode', 'int');
 		$this->addType('smimeCertificateId', 'integer');
+		$this->addType('junkMailboxId', 'integer');
+		$this->addType('moveJunkToMailbox', 'boolean');
 	}
 
 	/**
@@ -268,6 +277,8 @@ class MailAccount extends Entity {
 			'signatureAboveQuote' => ($this->isSignatureAboveQuote() === true),
 			'signatureMode' => $this->getSignatureMode(),
 			'smimeCertificateId' => $this->getSmimeCertificateId(),
+			'junkMailboxId' => $this->getJunkMailboxId(),
+			'moveJunkToMailbox' => ($this->isMoveJunkToMailbox() === true),
 		];
 
 		if (!is_null($this->getOutboundHost())) {
