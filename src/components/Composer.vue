@@ -309,8 +309,7 @@
 						</ActionCheckbox>
 						<ActionCheckbox v-if="smimeCertificateForCurrentAlias"
 							:checked="wantsSmimeSign"
-							@check="wantsSmimeSign = true"
-							@uncheck="wantsSmimeSign = false">
+							@change="setSmimeSign($event)">
 							{{ t('mail', 'Sign message with S/MIME') }}
 						</ActionCheckbox>
 						<ActionCheckbox v-if="smimeCertificateForCurrentAlias"
@@ -623,7 +622,7 @@ export default {
 				},
 			},
 			autoLimit: true,
-			wantsSmimeSign: this.smimeSign,
+			wantsSmimeSign: this.smimeSign || this.isSignSet,
 			wantsSmimeEncrypt: this.smimeEncrypt,
 			isPickerOpen: false,
 		}
@@ -783,7 +782,15 @@ export default {
 
 			return this.smimeCertificateForAlias(this.selectedAlias)
 		},
-
+		accountWithSmimeSignSet() {
+			return this.$store.getters.getPreference('smime-sign-accounts', '').split(',').filter((account) => account !== '')
+		},
+		/**
+		 * whether the user set a sign preference for the current account/alias
+		 */
+		 isSignSet() {
+			return this.accountWithSmimeSignSet.includes(this.selectedAlias.emailAddress)
+		},
 		/**
 		 * Whether the outgoing message should be signed with S/MIME.
 		 *
@@ -898,6 +905,29 @@ export default {
 		window.removeEventListener('mailvelope', this.onMailvelopeLoaded)
 	},
 	methods: {
+		setSmimeSign(e) {
+			console.log(e)
+			this.wantsSmimeSign = e.target.checked
+			let value
+			if (e.target.checked) {
+					 value = [...this.accountWithSmimeSignSet, this.selectedAlias.emailAddress]
+			} else {
+				value = this.accountWithSmimeSignSet.filter((email) => email !== this.selectedAlias.emailAddress)
+			}
+			console.log(e, value)
+			this.$store
+				.dispatch('savePreference', {
+					key: 'smime-sign-accounts',
+					value: value.toString(),
+				})
+				.then(() => {
+					showWarning(t('mail', value))
+				})
+				.catch((error) => Logger.error('could not save preferences', { error }))
+				.then((error) => {
+					showWarning(t('mail', error))
+				})
+		},
 		openPicker() {
 			this.isPickerOpen = true
 		},
