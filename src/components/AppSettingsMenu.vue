@@ -93,9 +93,38 @@
 		<SmimeCertificateModal v-if="displaySmimeCertificateModal"
 			@close="displaySmimeCertificateModal = false" />
 
+		<h2 class="mailvelope-section">
+			{{ t('mail', 'Sorting') }}
+		</h2>
+		<p  class="app-settings">
+			<input
+				id="unread-first-toggle"
+				class="checkbox"
+				type="checkbox"
+				:checked="unreadFirst"
+				@change="onToggleUnreadFirst">
+			<label for="unread-first-toggle">{{ unreadFirstText }}</label>
+		</p>
+		<div class="chronological-order-section"> <p>{{t('mail', 'Sort by')}}</p>
+			<div>
+			<ButtonVue
+				:type="sortOrder === 'newest' ? 'primary' : 'secondary'"
+				@click="onSortByDate">
+				{{ t('mail', 'Newest') }}
+			</ButtonVue>
+			<ButtonVue
+				:type="sortOrder === 'oldest' ? 'primary' : 'secondary'"
+				@click="onSortByDate">
+				{{ t('mail', 'Oldest') }}
+			</ButtonVue>
+		</div>
+		</div>
+
 		<p class="mailvelope-section">
 			{{ t('mail', 'Looking for a way to encrypt your emails?') }}
 		</p>
+
+		
 		<a
 			href="https://www.mailvelope.com/"
 			target="_blank"
@@ -143,11 +172,16 @@ export default {
 			displayKeyboardShortcuts: false,
 			// eslint-disable-next-line
 			autoTaggingText: t('mail', 'Automatically classify importance of new email'),
+			unreadFirstText:t('mail', 'Unread first'),
 			toggleAutoTagging: false,
 			displaySmimeCertificateModal: false,
+			sortOrder: 'newest',
 		}
 	},
 	computed: {
+		unreadFirst() {
+			return false //this.$store.getters.getPreference('unread-first', false) ==="true"
+		},
 		useBottomReplies() {
 			return this.$store.getters.getPreference('reply-mode', 'top') === 'bottom'
 		},
@@ -203,6 +237,41 @@ export default {
 				.then(() => {
 					this.loadingOptOutSettings = false
 				})
+		},
+		async onSortByDate(e) {
+			const previousValue = this.sortOrder
+			this.sortBy = e.target.innerText.toLowerCase()
+			try {
+				await this.$store
+					.dispatch('savePreference', {
+						key: 'sort-order',
+						value: this.sortOrder,
+					})
+			} catch (error) {
+				Logger.error('could not save preferences', { error })
+
+				showError(t('mail', 'Could not update preference'))
+			} finally {
+				this.sortBy = previousValue
+			}
+			window.location.reload()
+		},
+		async onToggleUnreadFirst(e) {
+			this.toggleUnreadFirst = true
+
+			/*try {
+				await this.$store
+					.dispatch('savePreference', {
+						key: 'unread-first',
+						value: e.target.checked ? 'true' : 'false',
+					})
+			} catch (error) {
+				Logger.error('could not save preferences', { error })
+
+				showError(t('mail', 'Could not update preference'))
+			} finally {
+				this.toggleUnreadFirst = false
+			}*/
 		},
 		async onToggleAutoTagging(e) {
 			this.toggleAutoTagging = true
@@ -300,5 +369,15 @@ p.app-settings {
 		margin-right: 10px;
 	}
 
+}
+.chronological-order-section{
+	display: flex;
+	align-items: center;
+	& > div:first-of-type {
+		display: flex;
+	}
+	& >p {
+		margin-right: 5px;
+	}
 }
 </style>

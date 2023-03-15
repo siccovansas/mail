@@ -701,7 +701,7 @@ class MessageMapper extends QBMapper {
 	 *
 	 * @return int[]
 	 */
-	public function findIdsByQuery(Mailbox $mailbox, SearchQuery $query, ?int $limit, array $uids = null): array {
+	public function findIdsByQuery(Mailbox $mailbox, SearchQuery $query, ?string $sortOrder, ?int $limit, array $uids = null): array {
 		$qb = $this->db->getQueryBuilder();
 
 		if ($this->needDistinct($query)) {
@@ -822,7 +822,9 @@ class MessageMapper extends QBMapper {
 
 		$select->andWhere($qb->expr()->isNull('m2.id'));
 
-		$select->orderBy('m.sent_at', 'desc');
+		if($sortOrder){
+			$select->orderBy('m.sent_at', $sortOrder);
+		}
 
 		if ($limit !== null) {
 			$select->setMaxResults($limit);
@@ -1079,7 +1081,7 @@ class MessageMapper extends QBMapper {
 	 *
 	 * @return Message[]
 	 */
-	public function findByIds(string $userId, array $ids): array {
+	public function findByIds(string $userId, array $ids ,?string $sortOrder ): array {
 		if (empty($ids)) {
 			return [];
 		}
@@ -1089,9 +1091,15 @@ class MessageMapper extends QBMapper {
 			->from($this->getTableName())
 			->where(
 				$qb->expr()->in('id', $qb->createParameter('ids'))
-			)
-			->orderBy('sent_at', 'desc');
-
+			);
+		if($sortOrder === 'desc' || $sortOrder === 'asc'){
+			$qb->orderBy('sent_at', $sortOrder);
+		}
+		else{
+			$qb->orderBy('sent_at', 'desc');
+			//TODO: add logging here
+		}
+		
 		$results = [];
 		foreach (array_chunk($ids, 1000) as $chunk) {
 			$qb->setParameter('ids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);

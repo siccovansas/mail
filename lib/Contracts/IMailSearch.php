@@ -53,6 +53,7 @@ interface IMailSearch {
 	 * @param Mailbox $mailbox
 	 * @param string|null $filter
 	 * @param int|null $cursor
+	 * @param string $sortOrder
 	 * @param int|null $limit
 	 *
 	 * @return Message[]
@@ -64,6 +65,7 @@ interface IMailSearch {
 								 Mailbox $mailbox,
 								 ?string $filter,
 								 ?int $cursor,
+								 string $sortOrder,
 								 ?int $limit): array;
 
 	/**

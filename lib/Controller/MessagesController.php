@@ -137,6 +137,7 @@ class MessagesController extends Controller {
 	public function index(int $mailboxId,
 						  int $cursor = null,
 						  string $filter = null,
+						  string $sortOrder = 'newest',
 						  int $limit = null): JSONResponse {
 		try {
 			$mailbox = $this->mailManager->getMailbox($this->currentUserId, $mailboxId);
@@ -145,14 +146,15 @@ class MessagesController extends Controller {
 			return new JSONResponse([], Http::STATUS_FORBIDDEN);
 		}
 
-		$this->logger->debug("loading messages of folder <$mailboxId>");
-
+		$this->logger->debug("loading messages of mailbox <$mailboxId>");
+		$order = $sortOrder === 'oldest' ? 'ASC' : 'DESC';
 		return new JSONResponse(
 			$this->mailSearch->findMessages(
 				$account,
 				$mailbox,
 				$filter === '' ? null : $filter,
 				$cursor,
+				$order,
 				$limit
 			)
 		);

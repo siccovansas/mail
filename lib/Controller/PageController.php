@@ -125,7 +125,10 @@ class PageController extends Controller {
 			'debug',
 			$this->config->getSystemValue('debug', false)
 		);
-
+		$this->initialStateService->provideInitialState(
+			'smime-sign-accounts',
+			$this->preferences->getPreference($this->currentUserId, 'smime-sign-accounts','')
+		);
 		$this->initialStateService->provideInitialState(
 			'ncVersion',
 			$this->config->getSystemValue('version', '0.0.0')
@@ -162,6 +165,11 @@ class PageController extends Controller {
 			$this->tagMapper->getAllTagsForUser($this->currentUserId)
 		);
 
+		$this->initialStateService->provideInitialState(
+			'sort-order',
+			$this->preferences->getPreference($this->currentUserId, 'sort-order', 'newest-first')
+		);
+		
 		try {
 			$password = $this->credentialStore->getLoginCredentials()->getPassword();
 			$passwordIsUnavailable = $password === null || $password === '';
@@ -183,6 +191,7 @@ class PageController extends Controller {
 				'collect-data' => $this->preferences->getPreference($this->currentUserId, 'collect-data', 'true'),
 				'start-mailbox-id' => $this->preferences->getPreference($this->currentUserId, 'start-mailbox-id'),
 				'tag-classified-messages' => $this->preferences->getPreference($this->currentUserId, 'tag-classified-messages', 'true'),
+
 			]);
 		$this->initialStateService->provideInitialState(
 			'prefill_displayName',
