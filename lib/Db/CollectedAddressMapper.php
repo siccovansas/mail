@@ -31,7 +31,6 @@ use function array_map;
  * @template-extends QBMapper<CollectedAddress>
  */
 class CollectedAddressMapper extends QBMapper {
-
 	/**
 	 * @param IDBConnection $db
 	 */
@@ -76,7 +75,7 @@ class CollectedAddressMapper extends QBMapper {
 		return count($this->findEntities($dbQuery)) > 0;
 	}
 
-	public function getTotal() {
+	public function getTotal(): int {
 		/* @var $qb IQueryBuilder */
 		$qb = $this->db->getQueryBuilder();
 		$qb->select($qb->func()->count())
@@ -90,8 +89,12 @@ class CollectedAddressMapper extends QBMapper {
 
 	/**
 	 * @param int|null $minId
+	 *
+	 * @return CollectedAddress[]
+	 *
+	 * @psalm-return array<CollectedAddress>
 	 */
-	public function getChunk($minId = null) {
+	public function getChunk($minId = null): array {
 		/* @var $qb IQueryBuilder */
 		$qb = $this->db->getQueryBuilder();
 		$query = $qb->select('*')
@@ -113,7 +116,7 @@ class CollectedAddressMapper extends QBMapper {
 			->leftJoin('c', 'mail_accounts', 'a', $qb1->expr()->eq('c.user_id', 'a.user_id'))
 			->where($qb1->expr()->isNull('a.id'));
 		$result = $idsQuery->execute();
-		$ids = array_map(function (array $row) {
+		$ids = array_map(static function (array $row) {
 			return (int)$row['id'];
 		}, $result->fetchAll());
 		$result->closeCursor();

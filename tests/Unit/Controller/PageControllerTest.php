@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /**
  * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
  *
  * Mail
  *
@@ -32,10 +33,15 @@ use OCA\Mail\Db\TagMapper;
 use OCA\Mail\Service\AccountService;
 use OCA\Mail\Service\AliasesService;
 use OCA\Mail\Service\MailManager;
+use OCA\Mail\Service\OutboxService;
+use OCA\Mail\Service\SmimeService;
 use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Services\IInitialState;
+use OCP\Authentication\LoginCredentials\ICredentials;
+use OCP\Authentication\LoginCredentials\IStore as ICredentialStore;
+use OCP\EventDispatcher\IEventDispatcher;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -45,7 +51,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\LoggerInterface;
 
 class PageControllerTest extends TestCase {
-
 	/** @var string */
 	private $appName;
 
@@ -82,11 +87,22 @@ class PageControllerTest extends TestCase {
 	/** @var IInitialState|MockObject */
 	private $initialState;
 
+	/** @var LoggerInterface|MockObject */
+	private $logger;
+
+	/** @var OutboxService|MockObject */
+	private $outboxService;
+
+	/** @var IEventDispatcher|MockObject */
+	private $eventDispatcher;
+
+	/** @var ICredentialStore|MockObject */
+	private $credentialStore;
+
 	/** @var PageController */
 	private $controller;
 
-	/** @var LoggerInterface|MockObject */
-	private $logger;
+	private SmimeService $smimeService;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -104,6 +120,10 @@ class PageControllerTest extends TestCase {
 		$this->tagMapper = $this->createMock(TagMapper::class);
 		$this->initialState = $this->createMock(IInitialState::class);
 		$this->logger = $this->createMock(LoggerInterface::class);
+		$this->outboxService = $this->createMock(OutboxService::class);
+		$this->eventDispatcher = $this->createMock(IEventDispatcher::class);
+		$this->credentialStore = $this->createMock(ICredentialStore::class);
+		$this->smimeService = $this->createMock(SmimeService::class);
 
 		$this->controller = new PageController(
 			$this->appName,
@@ -118,7 +138,11 @@ class PageControllerTest extends TestCase {
 			$this->mailManager,
 			$this->tagMapper,
 			$this->initialState,
-			$this->logger
+			$this->logger,
+			$this->outboxService,
+			$this->eventDispatcher,
+			$this->credentialStore,
+			$this->smimeService,
 		);
 	}
 
@@ -126,13 +150,14 @@ class PageControllerTest extends TestCase {
 		$account1 = $this->createMock(Account::class);
 		$account2 = $this->createMock(Account::class);
 		$mailbox = $this->createMock(Mailbox::class);
-		$this->preferences->expects($this->exactly(5))
+		$this->preferences->expects($this->exactly(6))
 			->method('getPreference')
 			->willReturnMap([
 				[$this->userId, 'account-settings', '[]', json_encode([])],
 				[$this->userId, 'external-avatars', 'true', 'true'],
 				[$this->userId, 'reply-mode', 'top', 'bottom'],
 				[$this->userId, 'collect-data', 'true', 'true'],
+				[$this->userId, 'start-mailbox-id', null, '123'],
 				[$this->userId, 'tag-classified-messages', 'true', 'true'],
 			]);
 		$this->accountService->expects($this->once())
@@ -203,43 +228,71 @@ class PageControllerTest extends TestCase {
 			->method('getSystemValue')
 			->willReturnMap([
 				['debug', false, true],
+				['version', '0.0.0', '26.0.0'],
 				['app.mail.attachment-size-limit', 0, 123],
 			]);
-		$this->config->expects($this->once())
+		$this->config->expects($this->exactly(6))
 			->method('getAppValue')
-			->with('mail', 'installed_version')
-			->will($this->returnValue('1.2.3'));
+			->withConsecutive(
+				[ 'mail', 'installed_version' ],
+				['mail', 'google_oauth_client_id' ],
+				['mail', 'microsoft_oauth_client_id' ],
+				['mail', 'microsoft_oauth_tenant_id' ],
+				['core', 'backgroundjobs_mode', 'ajax' ],
+				['mail', 'allow_new_mail_accounts', 'yes']
+			)->willReturnOnConsecutiveCalls(
+				$this->returnValue('1.2.3'),
+				$this->returnValue(''),
+				$this->returnValue(''),
+				$this->returnValue(''),
+				$this->returnValue('cron'),
+				$this->returnValue('yes')
+			);
 		$user->expects($this->once())
 			->method('getDisplayName')
 			->will($this->returnValue('Jane Doe'));
-		$user->expects($this->once())
-			->method('getUID')
+		$user->method('getUID')
 			->will($this->returnValue('jane'));
 		$this->config->expects($this->once())
 			->method('getUserValue')
 			->with($this->equalTo('jane'), $this->equalTo('settings'),
 				$this->equalTo('email'), $this->equalTo(''))
 			->will($this->returnValue('jane@doe.cz'));
-		$this->initialState->expects($this->exactly(6))
+
+		$loginCredentials = $this->createMock(ICredentials::class);
+		$loginCredentials->expects($this->once())
+			->method('getPassword')
+			->willReturn(null);
+		$this->credentialStore->expects($this->once())
+			->method('getLoginCredentials')
+			->willReturn($loginCredentials);
+
+		$this->initialState->expects($this->exactly(12))
 			->method('provideInitialState')
 			->withConsecutive(
 				['debug', true],
+				['ncVersion', '26.0.0'],
 				['accounts', $accountsJson],
 				['account-settings', []],
 				['tags', []],
+				['password-is-unavailable', true],
 				['prefill_displayName', 'Jane Doe'],
-				['prefill_email', 'jane@doe.cz']
+				['prefill_email', 'jane@doe.cz'],
+				['outbox-messages', []],
+				['disable-scheduled-send', false],
+				['allow-new-accounts', true],
+				['smime-certificates', []],
 			);
 
-		$expected = new TemplateResponse($this->appName, 'index',
-			[
-				'attachment-size-limit' => 123,
-				'external-avatars' => 'true',
-				'reply-mode' => 'bottom',
-				'app-version' => '1.2.3',
-				'collect-data' => 'true',
-				'tag-classified-messages' => 'true',
-			]);
+		$expected = new TemplateResponse($this->appName, 'index', [
+			'attachment-size-limit' => 123,
+			'external-avatars' => 'true',
+			'reply-mode' => 'bottom',
+			'app-version' => '1.2.3',
+			'collect-data' => 'true',
+			'start-mailbox-id' => '123',
+			'tag-classified-messages' => 'true',
+		]);
 		$csp = new ContentSecurityPolicy();
 		$csp->addAllowedFrameDomain('\'self\'');
 		$expected->setContentSecurityPolicy($csp);

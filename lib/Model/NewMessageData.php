@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /**
  * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
  *
  * Mail
  *
@@ -32,6 +33,9 @@ use OCA\Mail\AddressList;
  * @psalm-immutable
  */
 class NewMessageData {
+	private ?int $smimeCertificateId;
+	private bool $smimeSign;
+	private bool $smimeEncrypt;
 
 	/** @var Account */
 	private $account;
@@ -69,6 +73,8 @@ class NewMessageData {
 	 * @param string $body
 	 * @param array $attachments
 	 * @param bool $isHtml
+	 * @param int|null $smimeCertificateId
+	 * @param bool $smimeSign
 	 * @param bool $isMdnRequested
 	 */
 	public function __construct(Account $account,
@@ -79,7 +85,10 @@ class NewMessageData {
 								string $body,
 								array $attachments = [],
 								bool $isHtml = true,
-								bool $isMdnRequested = false) {
+								bool $isMdnRequested = false,
+								?int $smimeCertificateId = null,
+								bool $smimeSign = false,
+								bool $smimeEncrypt = false) {
 		$this->account = $account;
 		$this->to = $to;
 		$this->cc = $cc;
@@ -89,6 +98,9 @@ class NewMessageData {
 		$this->attachments = $attachments;
 		$this->isHtml = $isHtml;
 		$this->isMdnRequested = $isMdnRequested;
+		$this->smimeCertificateId = $smimeCertificateId;
+		$this->smimeSign = $smimeSign;
+		$this->smimeEncrypt = $smimeEncrypt;
 	}
 
 	/**
@@ -101,6 +113,8 @@ class NewMessageData {
 	 * @param array $attachments
 	 * @param bool $isHtml
 	 * @param bool $requestMdn
+	 * @param int|null $smimeCertificateId
+	 * @param bool $smimeSign
 	 * @return NewMessageData
 	 */
 	public static function fromRequest(Account $account,
@@ -111,12 +125,28 @@ class NewMessageData {
 									   string $body,
 									   array $attachments = [],
 									   bool $isHtml = true,
-									   bool $requestMdn = false): NewMessageData {
+									   bool $requestMdn = false,
+									   ?int $smimeCertificateId = null,
+									   bool $smimeSign = false,
+									   bool $smimeEncrypt = false): NewMessageData {
 		$toList = AddressList::parse($to ?: '');
 		$ccList = AddressList::parse($cc ?: '');
 		$bccList = AddressList::parse($bcc ?: '');
 
-		return new self($account, $toList, $ccList, $bccList, $subject, $body, $attachments, $isHtml, $requestMdn);
+		return new self(
+			$account,
+			$toList,
+			$ccList,
+			$bccList,
+			$subject,
+			$body,
+			$attachments,
+			$isHtml,
+			$requestMdn,
+			$smimeCertificateId,
+			$smimeSign,
+			$smimeEncrypt,
+		);
 	}
 
 	/**
@@ -174,5 +204,17 @@ class NewMessageData {
 
 	public function isMdnRequested(): bool {
 		return $this->isMdnRequested;
+	}
+
+	public function getSmimeSign(): bool {
+		return $this->smimeSign;
+	}
+
+	public function getSmimeCertificateId(): ?int {
+		return $this->smimeCertificateId;
+	}
+
+	public function getSmimeEncrypt(): bool {
+		return $this->smimeEncrypt;
 	}
 }

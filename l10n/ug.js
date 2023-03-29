@@ -1,6 +1,9 @@
 OC.L10N.register(
     "mail",
     {
+    "Important" : "مۇھىم",
+    "Work" : "ئىش",
+    "Personal" : "شەخسىي",
     "Name" : "ئاتى",
     "Password" : "ئىم",
     "None" : "يوق",
@@ -8,19 +11,24 @@ OC.L10N.register(
     "Connect" : "باغلان",
     "Cancel" : "ۋاز كەچ",
     "Send" : "يوللا",
+    "Favorite" : "يىغقۇچ",
     "Select" : "Select",
-    "Favorites" : "يىغقۇچ",
+    "Create" : "قۇر",
     "Other" : "باشقا",
     "Reply" : "جاۋاب قايتۇر",
     "Move" : "Move",
-    "Settings" : "تەڭشەكلەر",
     "Delete" : "ئۆچۈر",
+    "Add" : "قوش",
+    "Tags" : "بەلگەلەر",
+    "Search" : "Search",
+    "Date" : "Date",
+    "Remove" : "چىقىرىۋەت",
     "General" : "ئادەتتىكى",
     "User" : "User",
     "Host" : "باش ئاپپارات",
     "Port" : "ئېغىز",
-    "Search" : "Search",
     "Refresh" : "يېڭىلا",
-    "All" : "ھەممىسى"
+    "All" : "ھەممىسى",
+    "Favorites" : "يىغقۇچ"
 },
 "nplurals=2; plural=(n != 1);");

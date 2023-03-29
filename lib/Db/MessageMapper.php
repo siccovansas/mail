@@ -42,12 +42,15 @@ use OCP\IDBConnection;
 use OCP\IUser;
 use RuntimeException;
 use Throwable;
+use function array_chunk;
 use function array_combine;
 use function array_keys;
 use function array_map;
+use function array_merge;
 use function array_udiff;
 use function get_class;
 use function ltrim;
+use function mb_convert_encoding;
 use function mb_strcut;
 use function OCA\Mail\array_flat_map;
 
@@ -55,7 +58,6 @@ use function OCA\Mail\array_flat_map;
  * @template-extends QBMapper<Message>
  */
 class MessageMapper extends QBMapper {
-
 	/** @var ITimeFactory */
 	private $timeFactory;
 
@@ -82,7 +84,7 @@ class MessageMapper extends QBMapper {
 	 */
 	private function findUids(IQueryBuilder $query): array {
 		$result = $query->execute();
-		$uids = array_map(function (array $row) {
+		$uids = array_map(static function (array $row) {
 			return (int)$row['uid'];
 		}, $result->fetchAll());
 		$result->closeCursor();
@@ -97,7 +99,7 @@ class MessageMapper extends QBMapper {
 	 */
 	private function findIds(IQueryBuilder $query): array {
 		$result = $query->execute();
-		$uids = array_map(function (array $row) {
+		$uids = array_map(static function (array $row) {
 			return (int)$row['id'];
 		}, $result->fetchAll());
 		$result->closeCursor();
@@ -110,7 +112,7 @@ class MessageMapper extends QBMapper {
 
 		$query->select($query->func()->max('uid'))
 			->from($this->getTableName())
-			->where($query->expr()->eq('mailbox_id', $query->createNamedParameter($mailbox->getId())));
+			->where($query->expr()->eq('mailbox_id', $query->createNamedParameter($mailbox->getId(), IQueryBuilder::PARAM_INT), IQueryBuilder::PARAM_INT));
 
 		$result = $query->execute();
 		$max = (int)$result->fetchColumn();
@@ -202,11 +204,18 @@ class MessageMapper extends QBMapper {
 		$messagesQuery->select('id', 'subject', 'message_id', 'in_reply_to', 'references', 'thread_root_id')
 			->from($this->getTableName())
 			->where($messagesQuery->expr()->in('mailbox_id', $messagesQuery->createFunction($mailboxesQuery->getSQL()), IQueryBuilder::PARAM_INT_ARRAY))
-			->andWhere($messagesQuery->expr()->isNotNull('message_id'));
+			->andWhere(
+				$messagesQuery->expr()->isNotNull('message_id'),
+				$messagesQuery->expr()->orX(
+					$messagesQuery->expr()->isNotNull('in_reply_to'),
+					$messagesQuery->expr()->neq('references', $messagesQuery->createNamedParameter('[]'))
+				),
+			);
 
 		$result = $messagesQuery->execute();
-		$messages = array_map(function (array $row) {
-			return DatabaseMessage::fromRowData(
+		$messages = [];
+		while (($row = $result->fetch())) {
+			$messages[] = DatabaseMessage::fromRowData(
 				(int)$row['id'],
 				$row['subject'],
 				$row['message_id'],
@@ -214,7 +223,7 @@ class MessageMapper extends QBMapper {
 				$row['in_reply_to'],
 				$row['thread_root_id']
 			);
-		}, $result->fetchAll());
+		}
 		$result->closeCursor();
 
 		return $messages;
@@ -260,7 +269,6 @@ class MessageMapper extends QBMapper {
 	 */
 	public function insertBulk(Account $account, Message ...$messages): void {
 		$this->db->beginTransaction();
-
 		try {
 			$qb1 = $this->db->getQueryBuilder();
 			$qb1->insert($this->getTableName());
@@ -312,7 +320,6 @@ class MessageMapper extends QBMapper {
 				$qb1->setParameter('flag_notjunk', $message->getFlagNotjunk(), IQueryBuilder::PARAM_BOOL);
 				$qb1->setParameter('flag_important', $message->getFlagImportant(), IQueryBuilder::PARAM_BOOL);
 				$qb1->setParameter('flag_mdnsent', $message->getFlagMdnsent(), IQueryBuilder::PARAM_BOOL);
-
 				$qb1->execute();
 
 				$messageId = $qb1->getLastInsertId();
@@ -467,19 +474,6 @@ class MessageMapper extends QBMapper {
 		$perf->step("Untagged messages");
 	}
 
-	public function getTags(Message $message) : array {
-		$mqb = $this->db->getQueryBuilder();
-		$mqb->select('tag_id')
-			->from('mail_message_tags')
-			->where($mqb->expr()->eq('imap_message_id', $mqb->createNamedParameter($message->getMessageId())));
-		$result = $mqb->execute();
-		$ids = array_map(function (array $row) {
-			return (int)$row['tag_id'];
-		}, $result->fetchAll());
-
-		return $ids;
-	}
-
 	/**
 	 * @param Message ...$messages
 	 *
@@ -495,6 +489,8 @@ class MessageMapper extends QBMapper {
 				->set('preview_text', $query->createParameter('preview_text'))
 				->set('structure_analyzed', $query->createNamedParameter(true, IQueryBuilder::PARAM_BOOL))
 				->set('updated_at', $query->createNamedParameter($this->timeFactory->getTime(), IQueryBuilder::PARAM_INT))
+				->set('imip_message', $query->createParameter('imip_message'))
+				->set('encrypted', $query->createParameter('encrypted'))
 				->where($query->expr()->andX(
 					$query->expr()->eq('uid', $query->createParameter('uid')),
 					$query->expr()->eq('mailbox_id', $query->createParameter('mailbox_id'))
@@ -509,7 +505,19 @@ class MessageMapper extends QBMapper {
 				$query->setParameter('uid', $message->getUid(), IQueryBuilder::PARAM_INT);
 				$query->setParameter('mailbox_id', $message->getMailboxId(), IQueryBuilder::PARAM_INT);
 				$query->setParameter('flag_attachments', $message->getFlagAttachments(), $message->getFlagAttachments() === null ? IQueryBuilder::PARAM_NULL : IQueryBuilder::PARAM_BOOL);
-				$query->setParameter('preview_text', $message->getPreviewText(), $message->getPreviewText() === null ? IQueryBuilder::PARAM_NULL : IQueryBuilder::PARAM_STR);
+				$previewText = null;
+				if ($message->getPreviewText() !== null) {
+					$previewText = mb_strcut(mb_convert_encoding($message->getPreviewText(), 'UTF-8', 'UTF-8'), 0, 255);
+					// Make sure modifications are visible when these objects are used right away
+					$message->setPreviewText($previewText);
+				}
+				$query->setParameter(
+					'preview_text',
+					$previewText,
+					$previewText === null ? IQueryBuilder::PARAM_NULL : IQueryBuilder::PARAM_STR
+				);
+				$query->setParameter('imip_message', $message->isImipMessage(), IQueryBuilder::PARAM_BOOL);
+				$query->setParameter('encrypted', $message->isEncrypted(), IQueryBuilder::PARAM_BOOL);
 
 				$query->execute();
 			}
@@ -525,6 +533,57 @@ class MessageMapper extends QBMapper {
 		return $messages;
 	}
 
+	/**
+	 * @param Message ...$messages
+	 *
+	 * @return Message[]
+	 */
+	public function updateImipData(Message ...$messages): array {
+		$this->db->beginTransaction();
+
+		try {
+			$query = $this->db->getQueryBuilder();
+			$query->update($this->getTableName())
+				->set('imip_message', $query->createParameter('imip_message'))
+				->set('imip_error', $query->createParameter('imip_error'))
+				->set('imip_processed', $query->createParameter('imip_processed'))
+				->where($query->expr()->andX(
+					$query->expr()->eq('uid', $query->createParameter('uid')),
+					$query->expr()->eq('mailbox_id', $query->createParameter('mailbox_id'))
+				));
+
+			foreach ($messages as $message) {
+				if (empty($message->getUpdatedFields())) {
+					// Micro optimization
+					continue;
+				}
+
+				$query->setParameter('uid', $message->getUid(), IQueryBuilder::PARAM_INT);
+				$query->setParameter('mailbox_id', $message->getMailboxId(), IQueryBuilder::PARAM_INT);
+				$query->setParameter('imip_message', $message->isImipMessage(), IQueryBuilder::PARAM_BOOL);
+				$query->setParameter('imip_error', $message->isImipError(), IQueryBuilder::PARAM_BOOL);
+				$query->setParameter('imip_processed', $message->isImipProcessed(), IQueryBuilder::PARAM_BOOL);
+				$query->execute();
+			}
+
+			$this->db->commit();
+		} catch (Throwable $e) {
+			// Make sure to always roll back, otherwise the outer code runs in a failed transaction
+			$this->db->rollBack();
+
+			throw $e;
+		}
+
+		return $messages;
+	}
+
+	public function resetPreviewDataFlag(): void {
+		$qb = $this->db->getQueryBuilder();
+		$update = $qb->update($this->getTableName())
+			->set('structure_analyzed', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL));
+		$update->executeStatement();
+	}
+
 	public function deleteAll(Mailbox $mailbox): void {
 		$messageIdQuery = $this->db->getQueryBuilder();
 		$messageIdQuery->select('id')
@@ -535,7 +594,7 @@ class MessageMapper extends QBMapper {
 		$messageIds = $cursor->fetchAll();
 		$cursor->closeCursor();
 
-		$messageIds = array_map(function (array $row) {
+		$messageIds = array_map(static function (array $row) {
 			return (int)$row['id'];
 		}, $messageIds);
 
@@ -580,7 +639,7 @@ class MessageMapper extends QBMapper {
 			$messageIdQuery->setParameter('uids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
 			$cursor = $messageIdQuery->execute();
 
-			$messageIds = array_map(function (array $message) {
+			$messageIds = array_map(static function (array $message) {
 				return $message['id'];
 			}, $cursor->fetchAll());
 			$cursor->closeCursor();
@@ -616,6 +675,25 @@ class MessageMapper extends QBMapper {
 	}
 
 	/**
+	 * @param Account $account
+	 * @param string $messageId
+	 *
+	 * @return Message[]
+	 */
+	public function findByMessageId(Account $account, string $messageId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('messages.*')
+			->from($this->getTableName(), 'messages')
+			->join('messages', 'mail_mailboxes', 'mailboxes', $qb->expr()->eq('messages.mailbox_id', 'mailboxes.id', IQueryBuilder::PARAM_INT))
+			->where(
+				$qb->expr()->eq('mailboxes.account_id', $qb->createNamedParameter($account->getId(), IQueryBuilder::PARAM_INT), IQueryBuilder::PARAM_INT),
+				$qb->expr()->eq('messages.message_id', $qb->createNamedParameter($messageId, IQueryBuilder::PARAM_STR), IQueryBuilder::PARAM_STR)
+			);
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * @param Mailbox $mailbox
 	 * @param SearchQuery $query
 	 * @param int|null $limit
@@ -632,8 +710,14 @@ class MessageMapper extends QBMapper {
 			$select = $qb->select(['m.id', 'm.sent_at']);
 		}
 
+		$selfJoin = $select->expr()->andX(
+			$select->expr()->eq('m.mailbox_id', 'm2.mailbox_id', IQueryBuilder::PARAM_INT),
+			$select->expr()->eq('m.thread_root_id', 'm2.thread_root_id', IQueryBuilder::PARAM_INT),
+			$select->expr()->lt('m.sent_at', 'm2.sent_at', IQueryBuilder::PARAM_INT)
+		);
+
 		$select->from($this->getTableName(), 'm')
-			->leftJoin('m', $this->getTableName(), 'm2', 'm.mailbox_id = m2.mailbox_id and m.thread_root_id = m2.thread_root_id and m.sent_at < m2.sent_at');
+			->leftJoin('m', $this->getTableName(), 'm2', $selfJoin);
 
 		if (!empty($query->getFrom())) {
 			$select->innerJoin('m', 'mail_recipients', 'r0', 'm.id = r0.message_id');
@@ -651,6 +735,13 @@ class MessageMapper extends QBMapper {
 		$select->where(
 			$qb->expr()->eq('m.mailbox_id', $qb->createNamedParameter($mailbox->getId()), IQueryBuilder::PARAM_INT)
 		);
+
+		if (!empty($query->getTags())) {
+			$select->innerJoin('m', 'mail_message_tags', 'tags', 'm.message_id = tags.imap_message_id');
+			$select->andWhere(
+				$qb->expr()->in('tags.tag_id', $qb->createNamedParameter($query->getTags(), IQueryBuilder::PARAM_STR_ARRAY))
+			);
+		}
 
 		if (!empty($query->getFrom())) {
 			$select->andWhere(
@@ -687,11 +778,31 @@ class MessageMapper extends QBMapper {
 			);
 		}
 
+		if (!empty($query->getStart())) {
+			$select->andWhere(
+				$qb->expr()->gte('m.sent_at', $qb->createNamedParameter($query->getStart()), IQueryBuilder::PARAM_INT)
+			);
+		}
+
+		if (!empty($query->getEnd())) {
+			$select->andWhere(
+				$qb->expr()->lte('m.sent_at', $qb->createNamedParameter($query->getEnd()), IQueryBuilder::PARAM_INT)
+			);
+		}
+
+
+		if ($query->getHasAttachments()) {
+			$select->andWhere(
+				$qb->expr()->eq('m.flag_attachments', $qb->createNamedParameter($query->getHasAttachments(), IQueryBuilder::PARAM_INT))
+			);
+		}
+
 		if ($query->getCursor() !== null) {
 			$select->andWhere(
 				$qb->expr()->lt('m.sent_at', $qb->createNamedParameter($query->getCursor(), IQueryBuilder::PARAM_INT))
 			);
 		}
+
 		// createParameter
 		if ($uids !== null) {
 			$select->andWhere(
@@ -720,13 +831,13 @@ class MessageMapper extends QBMapper {
 		if ($uids !== null) {
 			return array_flat_map(function (array $chunk) use ($qb, $select) {
 				$qb->setParameter('uids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
-				return array_map(function (Message $message) {
+				return array_map(static function (Message $message) {
 					return $message->getId();
 				}, $this->findEntities($select));
 			}, array_chunk($uids, 1000));
 		}
 
-		return array_map(function (Message $message) {
+		return array_map(static function (Message $message) {
 			return $message->getId();
 		}, $this->findEntities($select));
 	}
@@ -741,8 +852,14 @@ class MessageMapper extends QBMapper {
 			$select = $qb->select(['m.id', 'm.sent_at']);
 		}
 
+		$selfJoin = $select->expr()->andX(
+			$select->expr()->eq('m.mailbox_id', 'm2.mailbox_id', IQueryBuilder::PARAM_INT),
+			$select->expr()->eq('m.thread_root_id', 'm2.thread_root_id', IQueryBuilder::PARAM_INT),
+			$select->expr()->lt('m.sent_at', 'm2.sent_at', IQueryBuilder::PARAM_INT)
+		);
+
 		$select->from($this->getTableName(), 'm')
-			->leftJoin('m', $this->getTableName(), 'm2', 'm.mailbox_id = m2.mailbox_id and m.thread_root_id = m2.thread_root_id and m.sent_at < m2.sent_at');
+			->leftJoin('m', $this->getTableName(), 'm2', $selfJoin);
 
 		if (!empty($query->getFrom())) {
 			$select->innerJoin('m', 'mail_recipients', 'r0', 'm.id = r0.message_id');
@@ -832,13 +949,13 @@ class MessageMapper extends QBMapper {
 		if ($uids !== null) {
 			return array_flat_map(function (array $chunk) use ($select) {
 				$select->setParameter('uids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
-				return array_map(function (Message $message) {
+				return array_map(static function (Message $message) {
 					return $message->getId();
 				}, $this->findEntities($select));
 			}, array_chunk($uids, 1000));
 		}
 
-		return array_map(function (Message $message) {
+		return array_map(static function (Message $message) {
 			return $message->getId();
 		}, $this->findEntities($select));
 	}
@@ -928,6 +1045,36 @@ class MessageMapper extends QBMapper {
 	}
 
 	/**
+	 * @param Mailbox $mailbox
+	 * @param string $userId
+	 * @param int[] $ids
+	 *
+	 * @return Message[]
+	 */
+	public function findByMailboxAndIds(Mailbox $mailbox, string $userId, array $ids): array {
+		if (empty($ids)) {
+			return [];
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where(
+				$qb->expr()->eq('mailbox_id', $qb->createNamedParameter($mailbox->getId()), IQueryBuilder::PARAM_INT),
+				$qb->expr()->in('id', $qb->createParameter('ids'))
+			)
+			->orderBy('sent_at', 'desc');
+
+		$results = [];
+		foreach (array_chunk($ids, 1000) as $chunk) {
+			$qb->setParameter('ids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
+			$results[] = $this->findRelatedData($this->findEntities($qb), $userId);
+		}
+		return array_merge([], ...$results);
+	}
+
+	/**
+	 * @param string $userId
 	 * @param int[] $ids
 	 *
 	 * @return Message[]
@@ -950,7 +1097,7 @@ class MessageMapper extends QBMapper {
 			$qb->setParameter('ids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
 			$results[] = $this->findRelatedData($this->findEntities($qb), $userId);
 		}
-		return array_merge(...$results);
+		return array_merge([], ...$results);
 	}
 
 	/**
@@ -961,19 +1108,28 @@ class MessageMapper extends QBMapper {
 	private function findRecipients(array $messages): array {
 		/** @var Message[] $indexedMessages */
 		$indexedMessages = array_combine(
-			array_map(function (Message $msg) {
+			array_map(static function (Message $msg) {
 				return $msg->getId();
 			}, $messages),
 			$messages
 		);
+
 		$qb2 = $this->db->getQueryBuilder();
 		$qb2->select('label', 'email', 'type', 'message_id')
 			->from('mail_recipients')
-			->where(
-				$qb2->expr()->in('message_id', $qb2->createNamedParameter(array_keys($indexedMessages), IQueryBuilder::PARAM_INT_ARRAY))
-			);
-		$recipientsResult = $qb2->execute();
-		foreach ($recipientsResult->fetchAll() as $recipient) {
+			->where($qb2->expr()->in('message_id', $qb2->createParameter('ids'), IQueryBuilder::PARAM_INT_ARRAY));
+
+		$recipientsResults = [];
+		foreach (array_chunk(array_keys($indexedMessages), 1000) as $chunk) {
+			$qb2->setParameter('ids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
+			$result = $qb2->execute();
+			$recipientsResults[] = $result->fetchAll();
+			$result->closeCursor();
+		}
+
+		$recipientsResults = array_merge([], ...$recipientsResults);
+
+		foreach ($recipientsResults as $recipient) {
 			$message = $indexedMessages[(int)$recipient['message_id']];
 			switch ($recipient['type']) {
 				case Address::TYPE_FROM:
@@ -992,13 +1148,12 @@ class MessageMapper extends QBMapper {
 					);
 					break;
 				case Address::TYPE_BCC:
-					$message->setFrom(
-						$message->getFrom()->merge(AddressList::fromRow($recipient))
+					$message->setBcc(
+						$message->getBcc()->merge(AddressList::fromRow($recipient))
 					);
 					break;
 			}
 		}
-		$recipientsResult->closeCursor();
 
 		return $messages;
 	}
@@ -1011,7 +1166,7 @@ class MessageMapper extends QBMapper {
 		$messages = $this->findRecipients($messages);
 		$tags = $this->tagMapper->getAllTagsForMessages($messages, $userId);
 		/** @var Message $message */
-		$messages = array_map(function ($message) use ($tags) {
+		$messages = array_map(static function ($message) use ($tags) {
 			$message->setTags($tags[$message->getMessageId()] ?? []);
 			return $message;
 		}, $messages);
@@ -1027,35 +1182,41 @@ class MessageMapper extends QBMapper {
 		$select = $this->db->getQueryBuilder();
 		$subSelect = $this->db->getQueryBuilder();
 
-		$inExpression = [];
-		$notInExpression = [];
-
-		foreach (array_chunk($ids, 1000) as $chunk) {
-			$inExpression[] = $subSelect->expr()->in('id', $select->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY));
-			$notInExpression[] = $subSelect->expr()->notIn('m.id', $select->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY));
-		}
-
 		$subSelect
 			->select($subSelect->func()->min('sent_at'))
 			->from($this->getTableName())
 			->where(
 				$subSelect->expr()->eq('mailbox_id', $select->createNamedParameter($mailbox->getId(), IQueryBuilder::PARAM_INT)),
-				$subSelect->expr()->orX(...$inExpression)
+				$subSelect->expr()->orX(
+					$subSelect->expr()->in('id', $select->createParameter('ids'), IQueryBuilder::PARAM_INT_ARRAY)
+				)
 			);
+
+		$selfJoin = $select->expr()->andX(
+			$select->expr()->eq('m.mailbox_id', 'm2.mailbox_id', IQueryBuilder::PARAM_INT),
+			$select->expr()->eq('m.thread_root_id', 'm2.thread_root_id', IQueryBuilder::PARAM_INT),
+			$select->expr()->lt('m.sent_at', 'm2.sent_at', IQueryBuilder::PARAM_INT)
+		);
 
 		$select
 			->select('m.id')
 			->from($this->getTableName(), 'm')
-			->leftJoin('m', $this->getTableName(), 'm2', 'm.mailbox_id = m2.mailbox_id and m.thread_root_id = m2.thread_root_id and m.sent_at < m2.sent_at')
+			->leftJoin('m', $this->getTableName(), 'm2', $selfJoin)
 			->where(
 				$select->expr()->eq('m.mailbox_id', $select->createNamedParameter($mailbox->getId(), IQueryBuilder::PARAM_INT)),
-				$select->expr()->andX(...$notInExpression),
-				$select->expr()->gt('m.sent_at', $select->createFunction('(' . $subSelect->getSQL() . ')'), IQueryBuilder::PARAM_INT),
-				$select->expr()->isNull('m2.id')
+				$select->expr()->andX($subSelect->expr()->notIn('m.id', $select->createParameter('ids'), IQueryBuilder::PARAM_INT_ARRAY)),
+				$select->expr()->isNull('m2.id'),
+				$select->expr()->gt('m.sent_at', $select->createFunction('(' . $subSelect->getSQL() . ')'), IQueryBuilder::PARAM_INT)
 			)
 			->orderBy('m.sent_at', 'desc');
 
-		return $this->findIds($select);
+		$results = [];
+		foreach (array_chunk($ids, 1000) as $chunk) {
+			$select->setParameter('ids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
+			$results[] = $this->findIds($select);
+		}
+
+		return array_merge([], ...$results);
 	}
 
 	/**
@@ -1104,39 +1265,45 @@ class MessageMapper extends QBMapper {
 			->leftJoin('m', 'mail_mailboxes', 'mb', $qb1->expr()->eq('m.mailbox_id', 'mb.id'))
 			->where($qb1->expr()->isNull('mb.id'));
 		$result = $idsQuery->execute();
-		$ids = array_map(function (array $row) {
-			return (int)$row['id'];
-		}, $result->fetchAll());
+		$ids = [];
+		while ($row = $result->fetch()) {
+			$ids[] = (int) $row['id'];
+		}
 		$result->closeCursor();
 
 		$qb2 = $this->db->getQueryBuilder();
+		$query = $qb2
+			->delete($this->getTableName())
+			->where($qb2->expr()->in('id', $qb2->createParameter('ids'), IQueryBuilder::PARAM_INT_ARRAY));
 		foreach (array_chunk($ids, 1000) as $chunk) {
-			$query = $qb2
-				->delete($this->getTableName())
-				->where($qb2->expr()->in('id', $qb2->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY), IQueryBuilder::PARAM_INT_ARRAY));
+			$query->setParameter('ids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
 			$query->execute();
 		}
 		$qb3 = $this->db->getQueryBuilder();
 		$recipientIdsQuery = $qb3->selectDistinct('r.id')
 			->from('mail_recipients', 'r')
 			->leftJoin('r', 'mail_messages', 'm', $qb3->expr()->eq('r.message_id', 'm.id'))
-			->where($qb3->expr()->isNull('m.id'));
+			->where(
+				$qb3->expr()->isNull('m.id'),
+				$qb3->expr()->isNull('r.local_message_id')
+			);
 		$result = $recipientIdsQuery->execute();
-		$ids = array_map(function (array $row) {
-			return (int)$row['id'];
-		}, $result->fetchAll());
+		while ($row = $result->fetch()) {
+			$ids[] = (int) $row['id'];
+		}
 		$result->closeCursor();
 
 		$qb4 = $this->db->getQueryBuilder();
+		$recipientsQuery = $qb4
+			->delete('mail_recipients')
+			->where($qb4->expr()->in('id', $qb4->createParameter('ids'), IQueryBuilder::PARAM_INT_ARRAY));
 		foreach (array_chunk($ids, 1000) as $chunk) {
-			$recipientsQuery = $qb4
-				->delete('mail_recipients')
-				->where($qb4->expr()->in('id', $qb4->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY), IQueryBuilder::PARAM_INT_ARRAY));
+			$recipientsQuery->setParameter('ids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
 			$recipientsQuery->execute();
 		}
 	}
 
-	public function getIdForUid(Mailbox $mailbox, $uid): ?int {
+	public function getIdForUid(Mailbox $mailbox, int $uid): ?int {
 		$qb = $this->db->getQueryBuilder();
 
 		$select = $qb
@@ -1148,6 +1315,7 @@ class MessageMapper extends QBMapper {
 			);
 		$result = $select->execute();
 		$rows = $result->fetchAll();
+		$result->closeCursor();
 		if (empty($rows)) {
 			return null;
 		}
@@ -1165,6 +1333,58 @@ class MessageMapper extends QBMapper {
 			->where(
 				$qb->expr()->isNull('message_id')
 			);
+
+		return $this->findEntities($select);
+	}
+
+	public function resetInReplyTo(): int {
+		$qb = $this->db->getQueryBuilder();
+
+		$update = $qb->update($this->tableName)
+			->set('in_reply_to', $qb->createNamedParameter('NULL', IQueryBuilder::PARAM_NULL))
+			->where(
+				$qb->expr()->like('in_reply_to', $qb->createNamedParameter("<>", IQueryBuilder::PARAM_STR), IQueryBuilder::PARAM_STR)
+			);
+		return $update->execute();
+	}
+
+	/**
+	 * Get all iMIP messages from the last two weeks
+	 * that haven't been processed yet
+	 * @return Message[]
+	 */
+	public function findIMipMessagesAscending(): array {
+		$time = $this->timeFactory->getTime() - 60 * 60 * 24 * 14;
+		$qb = $this->db->getQueryBuilder();
+
+		$select = $qb->select('*')
+			->from($this->getTableName())
+			->where(
+				$qb->expr()->eq('imip_message', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL), IQueryBuilder::PARAM_BOOL),
+				$qb->expr()->eq('imip_processed', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL), IQueryBuilder::PARAM_BOOL),
+				$qb->expr()->eq('imip_error', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL), IQueryBuilder::PARAM_BOOL),
+				$qb->expr()->eq('flag_junk', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL), IQueryBuilder::PARAM_BOOL),
+				$qb->expr()->gt('sent_at', $qb->createNamedParameter($time, IQueryBuilder::PARAM_INT)),
+			)->orderBy('sent_at', 'ASC'); // make sure we don't process newer messages first
+
+		return $this->findEntities($select);
+	}
+
+	/**
+	 * @return Message[]
+	 *
+	 * @throws \OCP\DB\Exception
+	 */
+	public function getUnanalyzed(int $lastRun, array $mailboxIds): array {
+		$qb = $this->db->getQueryBuilder();
+
+		$select = $qb->select('*')
+			->from($this->getTableName())
+			->where(
+				$qb->expr()->lte('sent_at', $qb->createNamedParameter($lastRun, IQueryBuilder::PARAM_INT), IQueryBuilder::PARAM_INT),
+				$qb->expr()->eq('structure_analyzed', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL), IQueryBuilder::PARAM_BOOL),
+				$qb->expr()->in('mailbox_id', $qb->createNamedParameter($mailboxIds, IQueryBuilder::PARAM_INT_ARRAY), IQueryBuilder::PARAM_INT_ARRAY),
+			)->orderBy('sent_at', 'ASC');
 
 		return $this->findEntities($select);
 	}

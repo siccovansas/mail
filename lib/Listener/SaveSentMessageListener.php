@@ -36,8 +36,10 @@ use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use Psr\Log\LoggerInterface;
 
+/**
+ * @template-implements IEventListener<Event|MessageSentEvent>
+ */
 class SaveSentMessageListener implements IEventListener {
-
 	/** @var MailboxMapper */
 	private $mailboxMapper;
 
@@ -83,14 +85,17 @@ class SaveSentMessageListener implements IEventListener {
 			return;
 		}
 
+		$client = $this->imapClientFactory->getClient($event->getAccount());
 		try {
 			$this->messageMapper->save(
-				$this->imapClientFactory->getClient($event->getAccount()),
+				$client,
 				$sentMailbox,
 				$event->getMail()
 			);
 		} catch (Horde_Imap_Client_Exception $e) {
 			throw new ServiceException('Could not save sent message on IMAP', 0, $e);
+		} finally {
+			$client->logout();
 		}
 	}
 }

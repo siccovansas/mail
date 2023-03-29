@@ -26,27 +26,18 @@ namespace OCA\Mail\Controller;
 use OCA\Mail\Contracts\IMailManager;
 use OCA\Mail\Exception\ClientException;
 use OCA\Mail\Exception\ServiceException;
+use OCA\Mail\Http\TrapError;
 use OCA\Mail\Service\AccountService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
-use Psr\Log\LoggerInterface;
 
 class ThreadController extends Controller {
-
-	/** @var string */
-	private $currentUserId;
-
-	/** @var LoggerInterface */
-	private $logger;
-
-	/** @var AccountService */
-	private $accountService;
-
-	/** @var IMailManager */
-	private $mailManager;
+	private string $currentUserId;
+	private AccountService $accountService;
+	private IMailManager $mailManager;
 
 	public function __construct(string $appName,
 								IRequest $request,
@@ -62,7 +53,6 @@ class ThreadController extends Controller {
 
 	/**
 	 * @NoAdminRequired
-	 * @TrapError
 	 *
 	 * @param int $id
 	 * @param int $destMailboxId
@@ -71,6 +61,7 @@ class ThreadController extends Controller {
 	 * @throws ClientException
 	 * @throws ServiceException
 	 */
+	#[TrapError]
 	public function move(int $id, int $destMailboxId): JSONResponse {
 		try {
 			$message = $this->mailManager->getMessage($this->currentUserId, $id);
@@ -95,7 +86,6 @@ class ThreadController extends Controller {
 
 	/**
 	 * @NoAdminRequired
-	 * @TrapError
 	 *
 	 * @param int $id
 	 *
@@ -103,6 +93,7 @@ class ThreadController extends Controller {
 	 * @throws ClientException
 	 * @throws ServiceException
 	 */
+	#[TrapError]
 	public function delete(int $id): JSONResponse {
 		try {
 			$message = $this->mailManager->getMessage($this->currentUserId, $id);

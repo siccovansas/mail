@@ -24,6 +24,7 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Controller;
 
+use OCA\Mail\Http\TrapError;
 use OCA\Mail\Contracts\IAttachmentService;
 use OCA\Mail\Exception\ClientException;
 use OCA\Mail\Service\Attachment\UploadedFile;
@@ -33,12 +34,8 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
 class LocalAttachmentsController extends Controller {
-
-	/** @var IAttachmentService */
-	private $attachmentService;
-
-	/** @var string */
-	private $userId;
+	private IAttachmentService $attachmentService;
+	private string $userId;
 
 	/**
 	 * @param string $appName
@@ -55,10 +52,10 @@ class LocalAttachmentsController extends Controller {
 
 	/**
 	 * @NoAdminRequired
-	 * @TrapError
 	 *
 	 * @return JSONResponse
 	 */
+	#[TrapError]
 	public function create(): JSONResponse {
 		$file = $this->request->getUploadedFile('attachment');
 

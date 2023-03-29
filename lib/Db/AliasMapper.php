@@ -24,7 +24,6 @@ use function array_map;
  * @template-extends QBMapper<Alias>
  */
 class AliasMapper extends QBMapper {
-
 	/**
 	 * @param IDBConnection $db
 	 */
@@ -96,8 +95,10 @@ class AliasMapper extends QBMapper {
 	/**
 	 * @param int $accountId the account whose aliases will be deleted
 	 * @param string $currentUserId the user that is currently logged in
+	 *
+	 * @return void
 	 */
-	public function deleteAll($accountId) {
+	public function deleteAll($accountId): void {
 		$qb = $this->db->getQueryBuilder();
 
 		$query = $qb
@@ -137,17 +138,19 @@ class AliasMapper extends QBMapper {
 			->leftJoin('a', 'mail_accounts', 'ac', $qb1->expr()->eq('a.account_id', 'ac.id'))
 			->where($qb1->expr()->isNull('ac.id'));
 		$result = $idsQuery->execute();
-		$ids = array_map(function (array $row) {
+		$ids = array_map(static function (array $row) {
 			return (int)$row['id'];
 		}, $result->fetchAll());
 		$result->closeCursor();
 
 		$qb2 = $this->db->getQueryBuilder();
+		$qb2->delete($this->getTableName())
+			->where(
+				$qb2->expr()->in('id', $qb2->createParameter('ids'), IQueryBuilder::PARAM_INT_ARRAY)
+			);
 		foreach (array_chunk($ids, 1000) as $chunk) {
-			$query = $qb2
-				->delete($this->getTableName())
-				->where($qb2->expr()->in('id', $qb2->createNamedParameter($chunk, IQueryBuilder::PARAM_INT_ARRAY), IQueryBuilder::PARAM_INT_ARRAY));
-			$query->execute();
+			$qb2->setParameter('ids', $chunk, IQueryBuilder::PARAM_INT_ARRAY);
+			$qb2->execute();
 		}
 	}
 }

@@ -40,8 +40,10 @@ use function in_array;
 use function json_decode;
 use function strtolower;
 
+/**
+ * @template-implements IEventListener<Event|MailboxesSynchronizedEvent>
+ */
 class MailboxesSynchronizedSpecialMailboxesUpdater implements IEventListener {
-
 	/** @var MailAccountMapper */
 	private $mailAccountMapper;
 
@@ -100,13 +102,23 @@ class MailboxesSynchronizedSpecialMailboxesUpdater implements IEventListener {
 				$mailAccount->setTrashMailboxId(null);
 			}
 		}
+		if ($mailAccount->getArchiveMailboxId() === null || !array_key_exists($mailAccount->getArchiveMailboxId(), $mailboxes)) {
+			try {
+				$archiveMailbox = $this->findSpecial($mailboxes, 'archive');
+				$mailAccount->setArchiveMailboxId($archiveMailbox->getId());
+			} catch (DoesNotExistException $e) {
+				$this->logger->info("Account " . $account->getId() . " does not have an archive mailbox");
+
+				$mailAccount->setArchiveMailboxId(null);
+			}
+		}
 
 		$this->mailAccountMapper->update($mailAccount);
 	}
 
 	private function indexMailboxes(array $mailboxes): array {
 		return array_combine(
-			array_map(function (Mailbox $mb): int {
+			array_map(static function (Mailbox $mb) : int {
 				return $mb->getId();
 			}, $mailboxes),
 			$mailboxes

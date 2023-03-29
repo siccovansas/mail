@@ -30,12 +30,12 @@ use OCA\Mail\Service\Avatar\AvatarFactory;
 use OCA\Mail\Service\Avatar\FaviconSource;
 use ChristophWurst\Nextcloud\Testing\TestCase;
 use OCA\Mail\Vendor\Favicon\Favicon;
+use OCP\Security\IRemoteHostValidator;
 use OCP\Files\IMimeTypeDetector;
 use OCP\Http\Client\IClientService;
 use OCP\IServerContainer;
 
 class FaviconSourceTest extends TestCase {
-
 	/** @var IServerContainer */
 	private $serverContainer;
 
@@ -55,7 +55,8 @@ class FaviconSourceTest extends TestCase {
 		$source = new FaviconSource(
 			$clientService,
 			new Favicon(),
-			$mimeDetector
+			$mimeDetector,
+			$this->serverContainer->get(IRemoteHostValidator::class),
 		);
 
 		$avatar = $source->fetch($email, $avatarFactory);

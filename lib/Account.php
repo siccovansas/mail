@@ -14,6 +14,7 @@
  * @author Thomas I <thomas@oatr.be>
  * @author Thomas Mueller <thomas.mueller@tmit.eu>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
  *
  * Mail
  *
@@ -34,9 +35,7 @@
 namespace OCA\Mail;
 
 use Horde_Imap_Client_Exception;
-use Horde_Imap_Client_Mailbox;
 use Horde_Imap_Client_Socket;
-use Horde_Mail_Rfc822_List;
 use Horde_Mail_Transport;
 use Horde_Mail_Transport_Smtphorde;
 use JsonSerializable;
@@ -50,9 +49,9 @@ use OCA\Mail\Model\Message;
 use OCP\ICacheFactory;
 use OCP\IConfig;
 use OCP\Security\ICrypto;
+use ReturnTypeWillChange;
 
 class Account implements JsonSerializable {
-
 	/** @var MailAccount */
 	private $account;
 
@@ -167,7 +166,7 @@ class Account implements JsonSerializable {
 			} catch (Horde_Imap_Client_Exception $e) {
 				throw new ServiceException(
 					"Could not connect to IMAP host $host:$port: " . $e->getMessage(),
-					(int) $e->getCode(),
+					$e->getCode(),
 					$e
 				);
 			}
@@ -175,23 +174,7 @@ class Account implements JsonSerializable {
 		return $this->client;
 	}
 
-	/**
-	 * @deprecated
-	 * @param string $folderId
-	 * @return Mailbox
-	 *
-	 * @throws ServiceException
-	 */
-	public function getMailbox($folderId) {
-		return new Mailbox(
-			$this->getImapConnection(),
-			new Horde_Imap_Client_Mailbox($folderId)
-		);
-	}
-
-	/**
-	 * @return array
-	 */
+	#[ReturnTypeWillChange]
 	public function jsonSerialize() {
 		return $this->account->toJson();
 	}
@@ -210,10 +193,7 @@ class Account implements JsonSerializable {
 		return $sslMode;
 	}
 
-	/**
-	 * @return string|Horde_Mail_Rfc822_List
-	 */
-	public function getEmail() {
+	public function getEmail(): string {
 		return $this->account->getEmail();
 	}
 

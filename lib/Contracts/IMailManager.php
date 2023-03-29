@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /**
  * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
  *
  * Mail
  *
@@ -23,7 +24,10 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Contracts;
 
+use Horde_Imap_Client;
+use Horde_Imap_Client_Socket;
 use OCA\Mail\Account;
+use OCA\Mail\Attachment;
 use OCA\Mail\Db\Mailbox;
 use OCA\Mail\Db\Message;
 use OCA\Mail\Db\Tag;
@@ -34,7 +38,6 @@ use OCA\Mail\Service\Quota;
 use OCP\AppFramework\Db\DoesNotExistException;
 
 interface IMailManager {
-
 	/**
 	 * @param string $uid
 	 * @param int $id
@@ -78,11 +81,12 @@ interface IMailManager {
 	 *
 	 * @return Message
 	 *
-	 * @throws ClientException
+	 * @throws DoesNotExistException
 	 */
 	public function getMessage(string $uid, int $id): Message;
 
 	/**
+	 * @param Horde_Imap_Client_Socket $client
 	 * @param Account $account
 	 * @param string $mailbox
 	 * @param int $uid
@@ -91,9 +95,13 @@ interface IMailManager {
 	 * @throws ClientException
 	 * @throws ServiceException
 	 */
-	public function getSource(Account $account, string $mailbox, int $uid): ?string;
+	public function getSource(Horde_Imap_Client_Socket $client,
+							  Account $account,
+							  string $mailbox,
+							  int $uid): ?string;
 
 	/**
+	 * @param Horde_Imap_Client_Socket $client
 	 * @param Account $account
 	 * @param Mailbox $mailbox
 	 * @param int $uid
@@ -103,7 +111,8 @@ interface IMailManager {
 	 *
 	 * @throws ServiceException
 	 */
-	public function getImapMessage(Account $account,
+	public function getImapMessage(Horde_Imap_Client_Socket $client,
+								   Account $account,
 								   Mailbox $mailbox,
 								   int $uid,
 								   bool $loadBody = false): IMAPMessage;
@@ -204,6 +213,14 @@ interface IMailManager {
 	/**
 	 * @param Account $account
 	 * @param Mailbox $mailbox
+	 *
+	 * @throws ServiceException
+	 */
+	public function clearMailbox(Account $account, Mailbox $mailbox): void;
+
+	/**
+	 * @param Account $account
+	 * @param Mailbox $mailbox
 	 * @param bool $subscribed
 	 *
 	 * @return Mailbox
@@ -229,9 +246,18 @@ interface IMailManager {
 	 * @param Account $account
 	 * @param Mailbox $mailbox
 	 * @param Message $message
-	 * @return array
+	 * @return Attachment[]
 	 */
 	public function getMailAttachments(Account $account, Mailbox $mailbox, Message $message) : array;
+
+	/**
+	 * @param Account $account
+	 * @param Mailbox $mailbox
+	 * @param Message $message
+	 * @param string $attachmentId
+	 * @return Attachment
+	 */
+	public function getMailAttachment(Account $account, Mailbox $mailbox, Message $message, string $attachmentId): Attachment;
 
 	/**
 	 * @param string $imapLabel
@@ -248,7 +274,7 @@ interface IMailManager {
 	 * @param string $mailbox
 	 * @return boolean
 	 */
-	public function isPermflagsEnabled(Account $account, string $mailbox): bool;
+	public function isPermflagsEnabled(Horde_Imap_Client_Socket $client, Account $account, string $mailbox): bool;
 
 	/**
 	 * Create a mail tag
@@ -293,4 +319,11 @@ interface IMailManager {
 	 * @throws ServiceException
 	 */
 	public function deleteThread(Account $account, Mailbox $mailbox, string $threadRootId): void;
+
+	/**
+	 * @param Account $account
+	 * @param string $messageId
+	 * @return Message[]
+	 */
+	public function getByMessageId(Account $account, string $messageId): array;
 }

@@ -26,9 +26,9 @@ declare(strict_types=1);
 namespace OCA\Mail\Service;
 
 use JsonSerializable;
+use ReturnTypeWillChange;
 
 class Quota implements JsonSerializable {
-
 	/** @var int */
 	private $usage;
 
@@ -49,6 +49,7 @@ class Quota implements JsonSerializable {
 		return $this->limit;
 	}
 
+	#[ReturnTypeWillChange]
 	public function jsonSerialize() {
 		return [
 			'usage' => $this->getUsage(),

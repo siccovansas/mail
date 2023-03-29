@@ -4,9 +4,9 @@
   -
   - @author 2019 Christoph Wurst <christoph@winzerhof-wurst.at>
   - @author 2020 Greta Doci <gretadoci@gmail.com>
+  - @author 2022 Richard Steinmetz <richard@steinmetz.cloud>
   -
-  -
-  - @license GNU AGPL version 3 or any later version
+  - @license AGPL-3.0-or-later
   -
   - This program is free software: you can redistribute it and/or modify
   - it under the terms of the GNU Affero General Public License as
@@ -24,60 +24,49 @@
 
 <template>
 	<AppSettingsDialog
+		id="app-settings-dialog"
 		:open.sync="showSettings"
 		:show-navigation="true">
 		<AppSettingsSection
+			id="account-settings"
 			:title="t('mail', 'Account settings')">
-			<div class="alias-item">
-				<p><strong>{{ displayName }}</strong> &lt;{{ email }}&gt;</p>
-				<a
-					v-if="!account.provisioningId"
-					class="button icon-rename"
-					:title="t('mail', 'Change name')"
-					@click="handleClick" />
-			</div>
-			<AliasSettings :account="account" />
+			<AliasSettings :account="account" @rename-primary-alias="scrollToAccountSettings" />
 		</AppSettingsSection>
-		<AppSettingsSection :title="t('mail', 'Signature')">
+		<AppSettingsSection id="signature" :title="t('mail', 'Signature')">
 			<p class="settings-hint">
 				{{ t('mail', 'A signature is added to the text of new messages and replies.') }}
 			</p>
 			<SignatureSettings :account="account" />
 		</AppSettingsSection>
-		<AppSettingsSection :title="t('mail', 'Writing mode')">
+		<AppSettingsSection id="writing-mode" :title="t('mail', 'Writing mode')">
 			<p class="settings-hint">
 				{{ t('mail', 'Preferred writing mode for new messages and replies.') }}
 			</p>
 			<EditorSettings :account="account" />
 		</AppSettingsSection>
-		<AppSettingsSection :title=" t('mail', 'Default folders')">
+		<AppSettingsSection id="default-folders" :title=" t('mail', 'Default folders')">
 			<p class="settings-hint">
 				{{
-					t('mail', 'The folders to use for drafts, sent messages and deleted messages.')
+					t('mail', 'The folders to use for drafts, sent messages, deleted messages and archived messages.')
 				}}
 			</p>
 			<AccountDefaultsSettings :account="account" />
 		</AppSettingsSection>
-		<AppSettingsSection v-if="account && !account.provisioningId" :title="t('mail', 'Mail server')">
-			<div id="mail-settings">
-				<AccountForm
-					:key="account.accountId"
-					ref="accountForm"
-					:display-name="displayName"
-					:email="email"
-					:save="onSave"
-					:account="account" />
-			</div>
+		<AppSettingsSection
+			v-if="account"
+			id="out-of-office-replies"
+			:title="t('mail', 'Autoresponder')">
+			<p class="settings-hint">
+				{{ t('mail', 'Automated reply to incoming messages. If someone sends you several messages, this automated reply will be sent at most once every 4 days.') }}
+			</p>
+			<OutOfOfficeForm v-if="account.sieveEnabled" :account="account" />
+			<p v-else>
+				{{ t('mail', 'Please connect to a sieve server first.') }}
+			</p>
 		</AppSettingsSection>
-		<AppSettingsSection v-if="account && !account.provisioningId" :title="t('mail', 'Sieve filter server')">
-			<div id="sieve-settings">
-				<SieveAccountForm
-					:key="account.accountId"
-					ref="sieveAccountForm"
-					:account="account" />
-			</div>
-		</AppSettingsSection>
-		<AppSettingsSection v-if="account && account.sieveEnabled" :title="t('mail', 'Sieve filter rules')">
+		<AppSettingsSection v-if="account && account.sieveEnabled"
+			id="sieve-filter"
+			:title="t('mail', 'Sieve filter rules')">
 			<div id="sieve-filter">
 				<SieveFilterForm
 					:key="account.accountId"
@@ -85,8 +74,30 @@
 					:account="account" />
 			</div>
 		</AppSettingsSection>
-		<AppSettingsSection :title="t('mail', 'Trusted senders')">
+		<AppSettingsSection id="trusted-sender" :title="t('mail', 'Trusted senders')">
 			<TrustedSenders />
+		</AppSettingsSection>
+		<AppSettingsSection v-if="account && !account.provisioningId"
+			id="mail-server"
+			:title="t('mail', 'Mail server')">
+			<div id="mail-settings">
+				<AccountForm
+					:key="account.accountId"
+					ref="accountForm"
+					:display-name="displayName"
+					:email="email"
+					:account="account" />
+			</div>
+		</AppSettingsSection>
+		<AppSettingsSection v-if="account && !account.provisioningId"
+			id="sieve-settings"
+			:title="t('mail', 'Sieve filter server')">
+			<div id="sieve-settings">
+				<SieveAccountForm
+					:key="account.accountId"
+					ref="sieveAccountForm"
+					:account="account" />
+			</div>
 		</AppSettingsSection>
 	</AppSettingsDialog>
 </template>
@@ -95,14 +106,14 @@
 import AccountForm from '../components/AccountForm'
 import EditorSettings from '../components/EditorSettings'
 import AccountDefaultsSettings from '../components/AccountDefaultsSettings'
-import Logger from '../logger'
 import SignatureSettings from '../components/SignatureSettings'
 import AliasSettings from '../components/AliasSettings'
-import AppSettingsDialog from '@nextcloud/vue/dist/Components/AppSettingsDialog'
-import AppSettingsSection from '@nextcloud/vue/dist/Components/AppSettingsSection'
+import { NcAppSettingsDialog as AppSettingsDialog, NcAppSettingsSection as AppSettingsSection } from '@nextcloud/vue'
 import TrustedSenders from './TrustedSenders'
 import SieveAccountForm from './SieveAccountForm'
 import SieveFilterForm from './SieveFilterForm'
+import OutOfOfficeForm from './OutOfOfficeForm'
+
 export default {
 	name: 'AccountSettings',
 	components: {
@@ -116,6 +127,7 @@ export default {
 		AppSettingsDialog,
 		AppSettingsSection,
 		AccountDefaultsSettings,
+		OutOfOfficeForm,
 	},
 	props: {
 		account: {
@@ -149,31 +161,23 @@ export default {
 				this.$emit('update:open', value)
 			}
 		},
-		open(value) {
+		async open(value) {
 			if (value) {
-				this.showSettings = true
+				await this.onOpen()
 			}
 		},
 	},
 	methods: {
-		onSave(data) {
-			Logger.log('saving data', { data })
-			return this.$store
-				.dispatch('updateAccount', {
-					...data,
-					accountId: this.account.id,
-				})
-				.then((account) => account)
-				.catch((error) => {
-					Logger.error('account update failed:', { error })
-					throw error
-				})
-		},
-		handleClick() {
+		scrollToAccountSettings() {
 			this.$refs.accountForm.$el.scrollIntoView({
 				behavior: 'smooth',
 			})
-
+		},
+		async onOpen() {
+			this.showSettings = true
+			await this.$store.dispatch('fetchActiveSieveScript', {
+				accountId: this.account.id,
+			})
 		},
 	},
 }
@@ -185,14 +189,6 @@ export default {
 	justify-content: space-between;
 }
 
-::v-deep .modal-container {
-	display: block;
-	overflow: scroll;
-	transition: transform 300ms ease;
-	border-radius: var(--border-radius-large);
-	box-shadow: 0 0 40px rgba(0,0,0,0.2);
-	padding: 30px 70px 20px;
-}
 .button.icon-rename {
 	background-image: var(--icon-rename-000);
 	background-color: var(--color-main-background);
@@ -218,5 +214,11 @@ h2 {
 }
 .app-settings-section {
 margin-bottom: 45px;
+}
+
+// Fix weird modal glitches on Firefox when toggling autoresponder
+:deep(.modal-container),
+:deep(.app-settings__wrapper) {
+	position: unset !important;
 }
 </style>

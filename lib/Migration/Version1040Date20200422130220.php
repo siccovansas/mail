@@ -11,7 +11,6 @@ use OCP\Migration\IOutput;
 use OCP\Migration\SimpleMigrationStep;
 
 class Version1040Date20200422130220 extends SimpleMigrationStep {
-
 	/** @var IDBConnection */
 	protected $connection;
 
@@ -35,6 +34,9 @@ class Version1040Date20200422130220 extends SimpleMigrationStep {
 		return $schema;
 	}
 
+	/**
+	 * @return void
+	 */
 	public function postSchemaChange(IOutput $output, \Closure $schemaClosure, array $options) {
 		// Reset locks and sync tokens
 		$qb1 = $this->connection->getQueryBuilder();

@@ -26,11 +26,11 @@ declare(strict_types=1);
 namespace OCA\Mail\IMAP\Threading;
 
 use JsonSerializable;
+use ReturnTypeWillChange;
 use function str_replace;
 use function strpos;
 
 class Message implements JsonSerializable {
-
 	/** @var string */
 	private $subject;
 
@@ -74,7 +74,8 @@ class Message implements JsonSerializable {
 		return $this->references;
 	}
 
-	public function jsonSerialize(): array {
+	#[ReturnTypeWillChange]
+	public function jsonSerialize() {
 		return [
 			'subject' => $this->subject,
 			'id' => $this->id,

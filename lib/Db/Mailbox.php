@@ -28,6 +28,7 @@ namespace OCA\Mail\Db;
 use JsonSerializable;
 use OCA\Mail\IMAP\MailboxStats;
 use OCP\AppFramework\Db\Entity;
+use ReturnTypeWillChange;
 use function base64_encode;
 use function in_array;
 use function json_decode;
@@ -65,6 +66,10 @@ use function strtolower;
  * @method void setSpecialUse(string $specialUse)
  * @method bool|null getSyncInBackground()
  * @method void setSyncInBackground(bool $sync)
+ * @method string|null getMyAcls()
+ * @method void setMyAcls(string|null $acls)
+ * @method bool|null isShared()
+ * @method void setShared(bool $shared)
  */
 class Mailbox extends Entity implements JsonSerializable {
 	protected $name;
@@ -82,6 +87,8 @@ class Mailbox extends Entity implements JsonSerializable {
 	protected $selectable;
 	protected $specialUse;
 	protected $syncInBackground;
+	protected $myAcls;
+	protected $shared;
 
 	/**
 	 * @var int
@@ -98,6 +105,7 @@ class Mailbox extends Entity implements JsonSerializable {
 		$this->addType('syncVanishedLock', 'integer');
 		$this->addType('selectable', 'boolean');
 		$this->addType('syncInBackground', 'boolean');
+		$this->addType('shared', 'boolean');
 	}
 
 	public function isInbox(): bool {
@@ -143,9 +151,10 @@ class Mailbox extends Entity implements JsonSerializable {
 	 * @return MailboxStats
 	 */
 	public function getStats(): MailboxStats {
-		return new MailboxStats($this->getMessages(), $this->getUnseen());
+		return new MailboxStats($this->getMessages(), $this->getUnseen(), $this->getMyAcls());
 	}
 
+	#[ReturnTypeWillChange]
 	public function jsonSerialize() {
 		$specialUse = $this->getSpecialUseParsed();
 		return [
@@ -161,6 +170,8 @@ class Mailbox extends Entity implements JsonSerializable {
 			'mailboxes' => [],
 			'syncInBackground' => ($this->getSyncInBackground() === true),
 			'unread' => $this->unseen,
+			'myAcls' => $this->myAcls,
+			'shared' => $this->shared === true,
 		];
 	}
 }

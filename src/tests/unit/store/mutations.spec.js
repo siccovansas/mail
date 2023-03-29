@@ -3,7 +3,7 @@
  *
  * @author 2020 Christoph Wurst <christoph@winzerhof-wurst.at>
  *
- * @license GNU AGPL version 3 or any later version
+ * @license AGPL-3.0-or-later
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,15 +41,17 @@ describe('Vuex store mutations', () => {
 			accountId: 13,
 			id: 13,
 			mailboxes: [],
+			aliases: [],
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accountList: [13],
 			accounts: {
 				13: {
 					accountId: 13,
 					id: 13,
 					mailboxes: [],
+					aliases: [],
 					collapsed: true,
 				},
 			},
@@ -80,9 +82,10 @@ describe('Vuex store mutations', () => {
 					delimiter: '.',
 				},
 			],
+			aliases: []
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accountList: [13],
 			accounts: {
 				13: {
@@ -91,6 +94,7 @@ describe('Vuex store mutations', () => {
 					mailboxes: [
 						345,
 					],
+					aliases: [],
 					collapsed: true,
 				},
 			},
@@ -141,10 +145,11 @@ describe('Vuex store mutations', () => {
 					specialRole: 'sent',
 				},
 			],
+			aliases: [],
 			personalNamespace: 'INBOX.',
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accountList: [13],
 			accounts: {
 				13: {
@@ -154,6 +159,7 @@ describe('Vuex store mutations', () => {
 						345,
 						346,
 					],
+					aliases: [],
 					collapsed: true,
 					personalNamespace: 'INBOX.',
 				},
@@ -183,7 +189,7 @@ describe('Vuex store mutations', () => {
 					envelopeLists: {},
 					path: 'INBOX.',
 					mailboxes: [],
-				}
+				},
 			},
 			tagList: [],
 			tags: {},
@@ -219,9 +225,10 @@ describe('Vuex store mutations', () => {
 					specialRole: 'archive',
 				},
 			],
+			aliases: []
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accountList: [13],
 			accounts: {
 				13: {
@@ -230,6 +237,7 @@ describe('Vuex store mutations', () => {
 					mailboxes: [
 						345,
 					],
+					aliases: [],
 					collapsed: true,
 				},
 			},
@@ -303,9 +311,10 @@ describe('Vuex store mutations', () => {
 					specialRole: 'archive',
 				},
 			],
+			aliases: []
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accountList: [13],
 			accounts: {
 				13: {
@@ -314,6 +323,7 @@ describe('Vuex store mutations', () => {
 					mailboxes: [
 						345,
 					],
+					aliases: [],
 					collapsed: true,
 				},
 			},
@@ -392,7 +402,7 @@ describe('Vuex store mutations', () => {
 					specialUse: ['archive'],
 					specialRole: 'archive',
 					mailboxes: [],
-				}
+				},
 			},
 			tagList: [],
 			tags: {},
@@ -408,10 +418,10 @@ describe('Vuex store mutations', () => {
 					delimiter: '.',
 					specialUse: ['archive'],
 					specialRole: 'archive',
-				}
+				},
 			})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accountList: [13],
 			accounts: {
 				13: {
@@ -483,7 +493,7 @@ describe('Vuex store mutations', () => {
 					specialUse: ['archive'],
 					specialRole: 'archive',
 					mailboxes: [],
-				}
+				},
 			},
 			tagList: [],
 			tags: {},
@@ -499,10 +509,10 @@ describe('Vuex store mutations', () => {
 					delimiter: '.',
 					specialUse: ['archive'],
 					specialRole: 'archive',
-				}
+				},
 			})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accountList: [13],
 			accounts: {
 				13: {
@@ -573,7 +583,7 @@ describe('Vuex store mutations', () => {
 			id: 27,
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accounts: {
 				13: {
 					accountId: 13,
@@ -618,7 +628,7 @@ describe('Vuex store mutations', () => {
 			id: 28,
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accounts: {
 				13: {
 					accountId: 13,
@@ -671,7 +681,7 @@ describe('Vuex store mutations', () => {
 			},
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accounts: {
 				[UNIFIED_ACCOUNT_ID]: {
 					accountId: UNIFIED_ACCOUNT_ID,
@@ -732,6 +742,7 @@ describe('Vuex store mutations', () => {
 				id: 123,
 				subject: 'henlo',
 				uid: 321,
+				threadRootId: '123-456-789',
 			},
 		})
 		mutations.addEnvelope(state, {
@@ -742,10 +753,11 @@ describe('Vuex store mutations', () => {
 				id: 124,
 				subject: 'henlo 2',
 				uid: 322,
+				threadRootId: '234-567-890',
 			},
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accounts: {
 				[UNIFIED_ACCOUNT_ID]: {
 					accountId: UNIFIED_ACCOUNT_ID,
@@ -761,6 +773,7 @@ describe('Vuex store mutations', () => {
 					id: 123,
 					subject: 'henlo',
 					tags: [],
+					threadRootId: '123-456-789',
 				},
 				12346: {
 					mailboxId: 27,
@@ -769,6 +782,7 @@ describe('Vuex store mutations', () => {
 					subject: 'henlo 2',
 					uid: 322,
 					tags: [],
+					threadRootId: '234-567-890',
 				},
 			},
 			mailboxes: {
@@ -822,7 +836,7 @@ describe('Vuex store mutations', () => {
 			},
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accounts: {
 				[UNIFIED_ACCOUNT_ID]: {
 					accountId: UNIFIED_ACCOUNT_ID,
@@ -916,7 +930,7 @@ describe('Vuex store mutations', () => {
 			id: 12345,
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accounts: {
 				[UNIFIED_ACCOUNT_ID]: {
 					accountId: UNIFIED_ACCOUNT_ID,
@@ -999,11 +1013,11 @@ describe('Vuex store mutations', () => {
 					databaseId: 124,
 					mailboxId: 27,
 					uid: 12346,
-				}
+				},
 			],
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			mailboxes: {
 				27: {
 					databaseId: 27,
@@ -1085,7 +1099,7 @@ describe('Vuex store mutations', () => {
 			},
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			accounts: {
 				[UNIFIED_ACCOUNT_ID]: {
 					accountId: UNIFIED_ACCOUNT_ID,
@@ -1179,7 +1193,7 @@ describe('Vuex store mutations', () => {
 			],
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			mailboxes: {
 				27: {
 					databaseId: 27,
@@ -1260,7 +1274,7 @@ describe('Vuex store mutations', () => {
 			},
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			mailboxes: {
 				27: {
 					databaseId: 27,
@@ -1324,7 +1338,7 @@ describe('Vuex store mutations', () => {
 			tagId: tag.id,
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			envelopes: {
 				12345: {
 					mailboxId: 27,
@@ -1372,7 +1386,7 @@ describe('Vuex store mutations', () => {
 			tagId: tag.id,
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			envelopes: {
 				12345: {
 					mailboxId: 27,
@@ -1406,7 +1420,7 @@ describe('Vuex store mutations', () => {
 			},
 		})
 
-		expect(state).to.deep.equal({
+		expect(state).toEqual({
 			tagList: [
 				1,
 			],
@@ -1421,5 +1435,55 @@ describe('Vuex store mutations', () => {
 				},
 			},
 		})
+	})
+
+	it('replace envelope for existing thread root id', () => {
+		const state = {
+			accounts: {
+				[UNIFIED_ACCOUNT_ID]: {
+					accountId: UNIFIED_ACCOUNT_ID,
+					id: UNIFIED_ACCOUNT_ID,
+					mailboxes: [],
+				},
+			},
+			envelopes: {},
+			mailboxes: {
+				27: {
+					name: 'INBOX',
+					accountId: 13,
+					envelopeLists: {},
+				},
+			},
+			tagList: [],
+			tags: {},
+		}
+
+		mutations.addEnvelope(state, {
+			query: undefined,
+			envelope: {
+				mailboxId: 27,
+				databaseId: 12345,
+				id: 123,
+				subject: 'henlo',
+				uid: 321,
+				threadRootId: '123-456-789',
+			},
+		})
+
+		expect(state.mailboxes[27].envelopeLists[''].length).toEqual(1)
+
+		mutations.addEnvelope(state, {
+			query: undefined,
+			envelope: {
+				mailboxId: 27,
+				databaseId: 12347,
+				id: 234,
+				subject: 'henlo',
+				uid: 432,
+				threadRootId: '123-456-789',
+			},
+		})
+
+		expect(state.mailboxes[27].envelopeLists[''].length).toEqual(1)
 	})
 })

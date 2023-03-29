@@ -3,7 +3,7 @@
   -
   - @author 2020 Christoph Wurst <christoph@winzerhof-wurst.at>
   -
-  - @license GNU AGPL version 3 or any later version
+  - @license AGPL-3.0-or-later
   -
   - This program is free software: you can redistribute it and/or modify
   - it under the terms of the GNU Affero General Public License as
@@ -20,33 +20,36 @@
   -->
 
 <template>
-	<Error v-if="error"
-		:error="t('mail', 'Could not open mailbox')"
-		message=""
-		role="alert" />
-	<Loading v-else-if="loadingEnvelopes" :hint="t('mail', 'Loading messages')" role="alert" />
-	<Loading
-		v-else-if="loadingCacheInitialization"
-		:hint="t('mail', 'Loading messages')"
-		:slow-hint="t('mail', 'Indexing your messages. This can take a bit longer for larger mailboxes.')" />
-	<EmptyMailboxSection v-else-if="isPriorityInbox && !hasMessages" key="empty" />
-	<EmptyMailbox v-else-if="!hasMessages" key="empty" />
-	<EnvelopeList
-		v-else
-		:account="account"
-		:mailbox="mailbox"
-		:search-query="searchQuery"
-		:envelopes="envelopesToShow"
-		:refreshing="refreshing"
-		:loading-more="loadingMore"
-		:load-more-button="showLoadMore"
-		@delete="onDelete"
-		@loadMore="loadMore" />
+	<div>
+		<Error v-if="error"
+			:error="t('mail', 'Could not open mailbox')"
+			message=""
+			role="alert" />
+		<LoadingSkeleton v-else-if="loadingEnvelopes" :number-of-lines="20" />
+		<Loading
+			v-else-if="loadingCacheInitialization"
+			:hint="t('mail', 'Loading messages …')"
+			:slow-hint="t('mail', 'Indexing your messages. This can take a bit longer for larger mailboxes.')" />
+		<EmptyMailboxSection v-else-if="isPriorityInbox && !hasMessages" key="empty" />
+		<EmptyMailbox v-else-if="!hasMessages" key="empty" />
+		<EnvelopeList
+			v-else
+			:account="account"
+			:mailbox="mailbox"
+			:search-query="searchQuery"
+			:envelopes="envelopesToShow"
+			:refreshing="refreshing"
+			:loading-more="loadingMore"
+			:load-more-button="showLoadMore"
+			@delete="onDelete"
+			@load-more="loadMore" />
+	</div>
 </template>
 
 <script>
 import EmptyMailbox from './EmptyMailbox'
 import EnvelopeList from './EnvelopeList'
+import LoadingSkeleton from './LoadingSkeleton'
 import Error from './Error'
 import { findIndex, propEq } from 'ramda'
 import isMobile from '@nextcloud/vue/dist/Mixins/isMobile'
@@ -56,8 +59,9 @@ import MailboxLockedError from '../errors/MailboxLockedError'
 import MailboxNotCachedError from '../errors/MailboxNotCachedError'
 import { matchError } from '../errors/match'
 import { wait } from '../util/wait'
+import { mailboxHasRights } from '../util/acl'
 import EmptyMailboxSection from './EmptyMailboxSection'
-import { showError } from '@nextcloud/dialogs'
+import { showError, showWarning } from '@nextcloud/dialogs'
 import NoTrashMailboxConfiguredError
 	from '../errors/NoTrashMailboxConfiguredError'
 
@@ -69,6 +73,7 @@ export default {
 		EnvelopeList,
 		Error,
 		Loading,
+		LoadingSkeleton,
 	},
 	mixins: [isMobile],
 	props: {
@@ -125,7 +130,7 @@ export default {
 		},
 		envelopesToShow() {
 			if (this.paginate === 'manual' && !this.expanded) {
-				return this.envelopes.slice(0, 5)
+				return this.envelopes.slice(0, this.initialPageSize)
 			}
 			return this.envelopes
 		},
@@ -144,15 +149,7 @@ export default {
 				if (typeof first !== 'undefined') {
 					logger.debug('refreshing mailbox')
 					if (this.$route.params.mailboxId === this.account.draftsMailboxId) {
-						this.$router.replace({
-							name: 'message',
-							params: {
-								mailboxId: this.$route.params.mailboxId,
-								filter: this.$route.params.filter ? this.$route.params.filter : undefined,
-								threadId: 'new',
-								draftId: first.databaseId,
-							},
-						})
+						// Don't navigate
 					} else {
 						this.$router.replace({
 							name: 'message',
@@ -172,7 +169,7 @@ export default {
 		mailbox() {
 			this.loadEnvelopes()
 				.then(() => {
-					logger.debug(`syncing mailbox ${this.mailbox.databaseId} (${this.searchQuery}) after mailbox change`)
+					logger.debug(`syncing mailbox ${this.mailbox.databaseId} (${this.query}) after mailbox change`)
 					this.sync(false)
 				})
 		},
@@ -181,8 +178,9 @@ export default {
 		},
 	},
 	created() {
-		this.bus.$on('loadMore', this.onScroll)
+		this.bus.$on('load-more', this.onScroll)
 		this.bus.$on('delete', this.onDelete)
+		this.bus.$on('archive', this.onArchive)
 		this.bus.$on('shortcut', this.handleShortcut)
 		this.loadMailboxInterval = setInterval(this.loadMailbox, 60000)
 	},
@@ -194,8 +192,9 @@ export default {
 			})
 	},
 	destroyed() {
-		this.bus.$off('loadMore', this.onScroll)
+		this.bus.$off('load-more', this.onScroll)
 		this.bus.$off('delete', this.onDelete)
+		this.bus.$off('archive', this.onArchive)
 		this.bus.$off('shortcut', this.handleShortcut)
 		this.stopInterval()
 	},
@@ -204,7 +203,7 @@ export default {
 			this.loadingCacheInitialization = true
 			this.error = false
 
-			logger.debug(`syncing mailbox ${this.mailbox.databaseId} (${this.searchQuery}) during cache initalization`)
+			logger.debug(`syncing mailbox ${this.mailbox.databaseId} (${this.query}) during cache initalization`)
 			this.sync(true)
 				.then(() => {
 					this.loadingCacheInitialization = false
@@ -258,14 +257,13 @@ export default {
 				}
 			} catch (error) {
 				await matchError(error, {
-					[MailboxLockedError.getName()]: async(error) => {
+					[MailboxLockedError.getName()]: async (error) => {
 						logger.info(`Mailbox ${this.mailbox.databaseId} (${this.searchQuery}) is locked`, { error })
-
 						await wait(15 * 1000)
 						// Keep trying
 						await this.loadEnvelopes()
 					},
-					[MailboxNotCachedError.getName()]: async(error) => {
+					[MailboxNotCachedError.getName()]: async (error) => {
 						logger.info(`Mailbox ${this.mailbox.databaseId} (${this.searchQuery}) not cached. Triggering initialization`, { error })
 						this.loadingEnvelopes = false
 
@@ -308,6 +306,15 @@ export default {
 			} finally {
 				this.loadingMore = false
 			}
+		},
+		hasDeleteAcl() {
+			return mailboxHasRights(this.mailbox, 'x')
+		},
+		hasSeenAcl() {
+			return mailboxHasRights(this.mailbox, 's')
+		},
+		hasArchiveAcl() {
+			return mailboxHasRights(this.mailbox, 'te')
 		},
 		async handleShortcut(e) {
 			const envelopes = this.envelopes
@@ -353,6 +360,9 @@ export default {
 				})
 				break
 			case 'del':
+				if (!this.hasDeleteAcl()) {
+					return
+				}
 				logger.debug('deleting', { env })
 				this.onDelete(env.databaseId)
 				try {
@@ -376,6 +386,40 @@ export default {
 				}
 
 				break
+			case 'arch':
+				logger.debug('archiving via shortcut')
+
+				if (this.account.archiveMailboxId === null) {
+					showWarning(t('mail', 'To archive a message please configure an archive mailbox in account settings'))
+					return
+				}
+
+				if (!this.hasArchiveAcl()) {
+					showWarning(t('mail', 'You are not allowed to move this message to the archive folder and/or delete this message from the current folder'))
+					return
+				}
+
+				if (env.mailboxId === this.account.archiveMailboxId) {
+					logger.debug('message is already in archive mailbox')
+					return
+				}
+
+				logger.debug('archiving', { env })
+				this.onDelete(env.databaseId)
+				try {
+					await this.$store.dispatch('moveThread', {
+						envelope: env,
+						destMailboxId: this.account.archiveMailboxId,
+					})
+				} catch (error) {
+					logger.error('could not archive envelope', {
+						env,
+						error,
+					})
+
+					showError(t('mail', 'Could not archive message'))
+				}
+				break
 			case 'flag':
 				logger.debug('flagging envelope via shortkey', { env })
 				this.$store.dispatch('toggleEnvelopeFlagged', env).catch((error) =>
@@ -391,6 +435,9 @@ export default {
 
 				break
 			case 'unseen':
+				if (this.hasSeenAcl()) {
+					return
+				}
 				logger.debug('marking message as seen/unseen via shortkey', { env })
 				this.$store.dispatch('toggleEnvelopeSeen', { envelope: env }).catch((error) =>
 					logger.error('could not mark envelope as seen/unseen via shortkey', {
@@ -398,6 +445,7 @@ export default {
 						error,
 					})
 				)
+
 				break
 			default:
 				logger.warn('shortcut ' + e.srcKey + ' is unknown. ignoring.')
@@ -425,6 +473,7 @@ export default {
 						logger.error('Could not sync envelopes: ' + error.message, { error, init })
 					},
 				})
+				throw error
 			} finally {
 				this.refreshing = false
 				logger.debug(`finished sync'ing mailbox ${this.mailbox.databaseId} (${this.searchQuery})`, { init })
@@ -449,7 +498,7 @@ export default {
 				return
 			}
 
-			const next = this.envelopes[idx === 0 ? idx : idx - 1]
+			const next = this.envelopes[idx === 0 ? 1 : idx - 1]
 			if (!next) {
 				logger.debug('no next/previous envelope, not navigating')
 				return
@@ -496,9 +545,8 @@ export default {
 
 <style lang="scss" scoped>
 // Fix vertical space between sections in priority inbox
-.nameimportant,
-.namestarred {
-	::v-deep #load-more-mail-messages {
+.nameimportant {
+	:deep(#load-more-mail-messages) {
 		margin-top: 0;
 		margin-bottom: 8px;
 	}

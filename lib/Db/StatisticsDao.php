@@ -33,7 +33,6 @@ use function array_combine;
 use function array_map;
 
 class StatisticsDao {
-
 	/** @var IDBConnection */
 	private $db;
 
@@ -44,7 +43,7 @@ class StatisticsDao {
 	private function emailCountResultToIndexedArray(array $rows): array {
 		return array_combine(
 			array_column($rows, 'email'),
-			array_map(function (string $val) {
+			array_map(static function (string $val) {
 				return (int)$val;
 			}, array_column($rows, 'count'))
 		);
@@ -53,7 +52,7 @@ class StatisticsDao {
 	public function getMessagesTotal(Mailbox ...$mb): int {
 		$qb = $this->db->getQueryBuilder();
 
-		$mailboxIds = array_map(function (Mailbox $mb) {
+		$mailboxIds = array_map(static function (Mailbox $mb) {
 			return $mb->getId();
 		}, $mb);
 		$select = $qb->select($qb->func()->count('*'))
@@ -85,7 +84,7 @@ class StatisticsDao {
 	public function getMessagesSentToGrouped(array $mailboxes, array $emails): array {
 		$qb = $this->db->getQueryBuilder();
 
-		$mailboxIds = array_map(function (Mailbox $mb) {
+		$mailboxIds = array_map(static function (Mailbox $mb) {
 			return $mb->getId();
 		}, $mailboxes);
 		$select = $qb->selectAlias('r.email', 'email')
@@ -143,7 +142,7 @@ class StatisticsDao {
 	public function getNumberOfMessagesGrouped(array $mailboxes, array $emails): array {
 		$qb = $this->db->getQueryBuilder();
 
-		$mailboxIds = array_map(function (Mailbox $mb) {
+		$mailboxIds = array_map(static function (Mailbox $mb) {
 			return $mb->getId();
 		}, $mailboxes);
 		$select = $qb->selectAlias('r.email', 'email')
@@ -187,7 +186,7 @@ class StatisticsDao {
 	public function getNumberOfMessagesWithFlagGrouped(array $mailboxes, string $flag, array $emails): array {
 		$qb = $this->db->getQueryBuilder();
 
-		$mailboxIds = array_map(function (Mailbox $mb) {
+		$mailboxIds = array_map(static function (Mailbox $mb) {
 			return $mb->getId();
 		}, $mailboxes);
 		$select = $qb->selectAlias('r.email', 'email')

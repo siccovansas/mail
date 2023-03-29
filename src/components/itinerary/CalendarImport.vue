@@ -3,7 +3,7 @@
   -
   - @author 2019 Christoph Wurst <christoph@winzerhof-wurst.at>
   -
-  - @license GNU AGPL version 3 or any later version
+  - @license AGPL-3.0-or-later
   -
   - This program is free software: you can redistribute it and/or modify
   - it under the terms of the GNU Affero General Public License as
@@ -20,26 +20,38 @@
   -->
 
 <template>
-	<Actions v-if="calendars.length" default-icon="icon-add">
+	<Actions v-if="calendars.length">
+		<template #icon>
+			<IconAdd :size="20" />
+		</template>
 		<ActionButton
 			v-for="(calendar, idx) in cals"
 			:key="idx"
-			:icon="calendar.loading ? 'icon-loading-small' : 'icon-add'"
 			@click="onImport(calendar)">
+			<template #icon>
+				<IconLoading v-if="calendar.loading" :size="20" />
+				<IconAdd v-else :size="20" />
+			</template>
 			{{ t('mail', 'Import into {calendar}', {calendar: calendar.displayname}) }}
 		</ActionButton>
 	</Actions>
 </template>
 
 <script>
-import Actions from '@nextcloud/vue/dist/Components/Actions'
-import ActionButton from '@nextcloud/vue/dist/Components/ActionButton'
+
+import { NcActions as Actions, NcActionButton as ActionButton, NcLoadingIcon as IconLoading } from '@nextcloud/vue'
+
+import IconAdd from 'vue-material-design-icons/Plus'
+import ical from 'ical.js'
+import moment from '@nextcloud/moment'
 
 export default {
 	name: 'CalendarImport',
 	components: {
 		Actions,
 		ActionButton,
+		IconAdd,
+		IconLoading,
 	},
 	props: {
 		calendars: {
@@ -76,6 +88,14 @@ export default {
 			return dt
 		}
 		return dt['@value']
+	},
+
+	addIcalTimeProperty(icalEvent, itineraryDt, icalPropertyName) {
+		const t = moment(this.itineraryDateTime(itineraryDt)).format()
+		const prop = icalEvent.updatePropertyWithValue(icalPropertyName, ical.Time.fromDateTimeString(t))
+		if (typeof itineraryDt !== 'string') {
+			prop.setParameter('TZID', itineraryDt.timezone)
+		}
 	},
 }
 </script>

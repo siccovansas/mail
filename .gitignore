@@ -34,6 +34,10 @@ coverage/
 tests/.phpunit.result.cache
 
 /.php_cs.cache
+/.php-cs-fixer.cache
 
 # VSCode / VSCodium
 .vscode/
+
+# PhpStorm
+.idea

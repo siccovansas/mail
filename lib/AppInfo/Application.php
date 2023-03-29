@@ -34,8 +34,12 @@ use OCA\Mail\Contracts\ITrustedSenderService;
 use OCA\Mail\Contracts\IUserPreferences;
 use OCA\Mail\Dashboard\ImportantMailWidget;
 use OCA\Mail\Dashboard\UnreadMailWidget;
+use OCA\Mail\Events\BeforeImapClientCreated;
+use OCA\Mail\Events\BeforeMessageSentEvent;
+use OCA\Mail\Events\DraftMessageCreatedEvent;
 use OCA\Mail\Events\DraftSavedEvent;
 use OCA\Mail\Events\MailboxesSynchronizedEvent;
+use OCA\Mail\Events\OutboxMessageCreatedEvent;
 use OCA\Mail\Events\SynchronizationEvent;
 use OCA\Mail\Events\MessageDeletedEvent;
 use OCA\Mail\Events\MessageFlaggedEvent;
@@ -45,7 +49,9 @@ use OCA\Mail\HordeTranslationHandler;
 use OCA\Mail\Http\Middleware\ErrorMiddleware;
 use OCA\Mail\Http\Middleware\ProvisioningMiddleware;
 use OCA\Mail\Listener\AddressCollectionListener;
+use OCA\Mail\Listener\AntiAbuseListener;
 use OCA\Mail\Listener\HamReportListener;
+use OCA\Mail\Listener\OauthTokenRefreshListener;
 use OCA\Mail\Listener\SpamReportListener;
 use OCA\Mail\Listener\DeleteDraftListener;
 use OCA\Mail\Listener\FlagRepliedMessageListener;
@@ -85,7 +91,7 @@ class Application extends App implements IBootstrap {
 	public function register(IRegistrationContext $context): void {
 		$context->registerParameter('hostname', Util::getServerHostName());
 
-		$context->registerService('userFolder', function (ContainerInterface $c) {
+		$context->registerService('userFolder', static function (ContainerInterface $c) {
 			$userContainer = $c->get(IServerContainer::class);
 			$uid = $c->get('UserId');
 
@@ -100,14 +106,17 @@ class Application extends App implements IBootstrap {
 		$context->registerServiceAlias(ITrustedSenderService::class, TrustedSenderService::class);
 		$context->registerServiceAlias(IUserPreferences::class, UserPreferenceService::class);
 
+		$context->registerEventListener(BeforeImapClientCreated::class, OauthTokenRefreshListener::class);
+		$context->registerEventListener(BeforeMessageSentEvent::class, AntiAbuseListener::class);
 		$context->registerEventListener(DraftSavedEvent::class, DeleteDraftListener::class);
+		$context->registerEventListener(DraftMessageCreatedEvent::class, DeleteDraftListener::class);
+		$context->registerEventListener(OutboxMessageCreatedEvent::class, DeleteDraftListener::class);
 		$context->registerEventListener(MailboxesSynchronizedEvent::class, MailboxesSynchronizedSpecialMailboxesUpdater::class);
 		$context->registerEventListener(MessageFlaggedEvent::class, MessageCacheUpdaterListener::class);
 		$context->registerEventListener(MessageFlaggedEvent::class, SpamReportListener::class);
 		$context->registerEventListener(MessageFlaggedEvent::class, HamReportListener::class);
 		$context->registerEventListener(MessageDeletedEvent::class, MessageCacheUpdaterListener::class);
 		$context->registerEventListener(MessageSentEvent::class, AddressCollectionListener::class);
-		$context->registerEventListener(MessageSentEvent::class, DeleteDraftListener::class);
 		$context->registerEventListener(MessageSentEvent::class, FlagRepliedMessageListener::class);
 		$context->registerEventListener(MessageSentEvent::class, InteractionListener::class);
 		$context->registerEventListener(MessageSentEvent::class, SaveSentMessageListener::class);

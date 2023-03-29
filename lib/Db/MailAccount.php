@@ -5,6 +5,7 @@
  * @author Jan-Christoph Borchardt <hey@jancborchardt.net>
  * @author Lukas Reschke <lukas@owncloud.com>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
  *
  * Mail
  *
@@ -46,7 +47,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getInboundUser()
  * @method void setInboundUser(string $inboundUser)
  * @method string|null getInboundPassword()
- * @method void setInboundPassword(string $inboundPassword)
+ * @method void setInboundPassword(?string $inboundPassword)
  * @method string getOutboundHost()
  * @method void setOutboundHost(string $outboundHost)
  * @method integer getOutboundPort()
@@ -56,7 +57,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getOutboundUser()
  * @method void setOutboundUser(string $outboundUser)
  * @method string|null getOutboundPassword()
- * @method void setOutboundPassword(string $outboundPassword)
+ * @method void setOutboundPassword(?string $outboundPassword)
  * @method string|null getSignature()
  * @method void setSignature(string|null $signature)
  * @method int getLastMailboxSync()
@@ -77,6 +78,8 @@ use OCP\AppFramework\Db\Entity;
  * @method int|null getSentMailboxId()
  * @method void setTrashMailboxId(?int $id)
  * @method int|null getTrashMailboxId()
+ * @method void setArchiveMailboxId(?int $id)
+ * @method int|null getArchiveMailboxId()
  * @method bool|null isSieveEnabled()
  * @method void setSieveEnabled(bool $sieveEnabled)
  * @method string|null getSieveHost()
@@ -91,8 +94,23 @@ use OCP\AppFramework\Db\Entity;
  * @method void setSievePassword(?string $sievePassword)
  * @method bool|null isSignatureAboveQuote()
  * @method void setSignatureAboveQuote(bool $signatureAboveQuote)
+ * @method string getAuthMethod()
+ * @method void setAuthMethod(string $method)
+ * @method int getSignatureMode()
+ * @method void setSignatureMode(int $signatureMode)
+ * @method string getOauthAccessToken()
+ * @method void setOauthAccessToken(string $token)
+ * @method string getOauthRefreshToken()
+ * @method void setOauthRefreshToken(string $token)
+ * @method int|null getOauthTokenTtl()
+ * @method void setOauthTokenTtl(int $ttl)
+ * @method int|null getSmimeCertificateId()
+ * @method void setSmimeCertificateId(int|null $smimeCertificateId)
  */
 class MailAccount extends Entity {
+	public const SIGNATURE_MODE_PLAIN = 0;
+	public const SIGNATURE_MODE_HTML = 1;
+
 	protected $userId;
 	protected $name;
 	protected $email;
@@ -112,6 +130,10 @@ class MailAccount extends Entity {
 	protected $order;
 	protected $showSubscribedOnly;
 	protected $personalNamespace;
+	protected $authMethod;
+	protected $oauthAccessToken;
+	protected $oauthRefreshToken;
+	protected $oauthTokenTtl;
 
 	/** @var int|null */
 	protected $draftsMailboxId;
@@ -121,6 +143,9 @@ class MailAccount extends Entity {
 
 	/** @var int|null */
 	protected $trashMailboxId;
+
+	/** @var int|null */
+	protected $archiveMailboxId;
 
 	/** @var bool */
 	protected $sieveEnabled = false;
@@ -140,6 +165,11 @@ class MailAccount extends Entity {
 	/** @var int|null */
 	protected $provisioningId;
 
+	/** @var int */
+	protected $signatureMode;
+
+	/** @var int|null */
+	protected $smimeCertificateId;
 
 	/**
 	 * @param array $params
@@ -196,16 +226,19 @@ class MailAccount extends Entity {
 		$this->addType('inboundPort', 'integer');
 		$this->addType('outboundPort', 'integer');
 		$this->addType('lastMailboxSync', 'integer');
-		$this->addType('provisioning_id', 'integer');
+		$this->addType('provisioningId', 'integer');
 		$this->addType('order', 'integer');
 		$this->addType('showSubscribedOnly', 'boolean');
 		$this->addType('personalNamespace', 'string');
 		$this->addType('draftsMailboxId', 'integer');
 		$this->addType('sentMailboxId', 'integer');
 		$this->addType('trashMailboxId', 'integer');
+		$this->addType('archiveMailboxId', 'integer');
 		$this->addType('sieveEnabled', 'boolean');
 		$this->addType('sievePort', 'integer');
 		$this->addType('signatureAboveQuote', 'boolean');
+		$this->addType('signatureMode', 'int');
+		$this->addType('smimeCertificateId', 'integer');
 	}
 
 	/**
@@ -230,8 +263,11 @@ class MailAccount extends Entity {
 			'draftsMailboxId' => $this->getDraftsMailboxId(),
 			'sentMailboxId' => $this->getSentMailboxId(),
 			'trashMailboxId' => $this->getTrashMailboxId(),
+			'archiveMailboxId' => $this->getArchiveMailboxId(),
 			'sieveEnabled' => ($this->isSieveEnabled() === true),
 			'signatureAboveQuote' => ($this->isSignatureAboveQuote() === true),
+			'signatureMode' => $this->getSignatureMode(),
+			'smimeCertificateId' => $this->getSmimeCertificateId(),
 		];
 
 		if (!is_null($this->getOutboundHost())) {

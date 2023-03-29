@@ -3,7 +3,7 @@
   -
   - @author 2020 Christoph Wurst <christoph@winzerhof-wurst.at>
   -
-  - @license GNU AGPL version 3 or any later version
+  - @license AGPL-3.0-or-later
   -
   - This program is free software: you can redistribute it and/or modify
   - it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,11 @@
 		</p>
 
 		<MailboxInlinePicker v-model="trashMailbox" :account="account" :disabled="saving" />
+		<p>
+			{{ t('mail', 'Archived messages are moved in:') }}
+		</p>
+
+		<MailboxInlinePicker v-model="archiveMailbox" :account="account" :disabled="saving" />
 	</div>
 </template>
 
@@ -134,6 +139,33 @@ export default {
 					})
 				} catch (error) {
 					logger.error('could not set trash mailbox', {
+						error,
+					})
+				} finally {
+					this.saving = false
+				}
+			},
+		},
+		archiveMailbox: {
+			get() {
+				const mb = this.$store.getters.getMailbox(this.account.archiveMailboxId)
+				if (!mb) {
+					return
+				}
+				return mb.databaseId
+			},
+			async set(archiveMailboxId) {
+				logger.debug('setting archive mailbox to ' + archiveMailboxId)
+				this.saving = true
+				try {
+					await this.$store.dispatch('patchAccount', {
+						account: this.account,
+						data: {
+							archiveMailboxId,
+						},
+					})
+				} catch (error) {
+					logger.error('could not set archive mailbox', {
 						error,
 					})
 				} finally {

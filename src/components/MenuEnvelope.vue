@@ -5,108 +5,173 @@
 			menu-align="right"
 			event=""
 			@click.native.prevent>
-			<ActionRouter v-if="withReply"
-				:icon="hasMultipleRecipients ? 'icon-reply-all' : 'icon-reply'"
-				:close-after-click="true"
-				:to="hasMultipleRecipients ? replyAllLink : replyOneLink">
-				{{ t('mail', 'Reply') }}
-			</ActionRouter>
-			<ActionRouter v-if="hasMultipleRecipients"
-				icon="icon-reply"
-				:close-after-click="true"
-				:to="replyOneLink">
-				{{ t('mail', 'Reply to sender only') }}
-			</ActionRouter>
-			<ActionRouter icon="icon-forward"
-				:close-after-click="true"
-				:to="forwardLink">
-				{{ t('mail', 'Forward') }}
-			</ActionRouter>
-			<ActionRouter icon="icon-add"
-				:to="{
-					name: 'message',
-					params: {
-						mailboxId: $route.params.mailboxId,
-						threadId: 'asNew',
-						filter: $route.params.filter,
-					},
-					query: {
-						messageId: envelope.databaseId,
-					},
-				}">
-				{{ t('mail', 'Edit as new message') }}
-			</ActionRouter>
-			<ActionButton icon="icon-important"
-				:close-after-click="true"
-				@click.prevent="onToggleImportant">
-				{{
-					isImportant ? t('mail', 'Mark unimportant') : t('mail', 'Mark important')
-				}}
-			</ActionButton>
-			<ActionButton :icon="iconFavorite"
-				:close-after-click="true"
-				@click.prevent="onToggleFlagged">
-				{{
-					envelope.flags.flagged ? t('mail', 'Mark unfavorite') : t('mail', 'Mark favorite')
-				}}
-			</ActionButton>
-			<ActionButton icon="icon-mail"
-				:close-after-click="true"
-				@click.prevent="onToggleSeen">
-				{{
-					envelope.flags.seen ? t('mail', 'Mark unread') : t('mail', 'Mark read')
-				}}
-			</ActionButton>
-			<ActionButton icon="icon-junk"
-				:close-after-click="true"
-				@click.prevent="onToggleJunk">
-				{{
-					envelope.flags.junk ? t('mail', 'Mark not spam') : t('mail', 'Mark as spam')
-				}}
-			</ActionButton>
-			<ActionButton
-				icon="icon-tag"
-				:close-after-click="true"
-				@click.prevent="onOpenTagModal">
-				{{ t('mail', 'Edit tags') }}
-			</ActionButton>
-			<ActionButton v-if="withSelect"
-				icon="icon-checkmark"
-				:close-after-click="true"
-				@click.prevent="toggleSelected">
-				{{
-					isSelected ? t('mail', 'Unselect') : t('mail', 'Select')
-				}}
-			</ActionButton>
-			<ActionButton icon="icon-external"
-				:close-after-click="true"
-				@click.prevent="onOpenMoveModal">
-				{{ t('mail', 'Move message') }}
-			</ActionButton>
-			<ActionButton icon="icon-calendar-dark"
-				:close-after-click="true"
-				@click.prevent="showEventModal = true">
-				{{ t('mail', 'Create event') }}
-			</ActionButton>
-			<ActionButton v-if="withShowSource"
-				:icon="sourceLoading ? 'icon-loading-small' : 'icon-details'"
-				:disabled="sourceLoading"
-				:close-after-click="true"
-				@click.prevent="onShowSourceModal">
-				{{ t('mail', 'View source') }}
-			</ActionButton>
-			<ActionLink v-if="debug"
-				icon="icon-download"
-				:download="threadingFileName"
-				:href="threadingFile"
-				:close-after-click="true">
-				{{ t('mail', 'Download thread data for debugging') }}
-			</ActionLink>
-			<ActionButton icon="icon-delete"
-				:close-after-click="true"
-				@click.prevent="onDelete">
-				{{ t('mail', 'Delete message') }}
-			</ActionButton>
+			<template v-if="!moreActionsOpen">
+				<ActionButton v-if="hasWriteAcl"
+					class="action--primary"
+					:close-after-click="true"
+					@click.prevent="onToggleImportant">
+					<template #icon>
+						<ImportantIcon
+							:size="20" />
+					</template>
+					{{
+						isImportant ? t('mail', 'Unimportant') : t('mail', 'Important')
+					}}
+				</ActionButton>
+				<ActionButton v-if="withReply"
+					:close-after-click="true"
+					@click="onReply">
+					<template #icon>
+						<ReplyAllIcon v-if="hasMultipleRecipients"
+							:title="t('mail', 'Reply all')"
+							:size="20" />
+						<ReplyIcon v-else
+							:title="t('mail', 'Reply')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Reply') }}
+				</ActionButton>
+				<ActionButton v-if="hasMultipleRecipients"
+					:close-after-click="true"
+					@click="onReply(true)">
+					<template #icon>
+						<ReplyIcon
+							:title="t('mail', 'Reply to sender only')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Reply to sender only') }}
+				</ActionButton>
+				<ActionButton :close-after-click="true"
+					@click="onForward">
+					<template #icon>
+						<ShareIcon
+							:title="t('mail', 'Forward')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Forward') }}
+				</ActionButton>
+				<ActionButton v-if="hasWriteAcl"
+					:close-after-click="true"
+					@click.prevent="onToggleJunk">
+					<template #icon>
+						<AlertOctagonIcon
+							:title="envelope.flags.$junk ? t('mail', 'Mark not spam') : t('mail', 'Mark as spam')"
+							:size="20" />
+					</template>
+					{{
+						envelope.flags.$junk ? t('mail', 'Mark not spam') : t('mail', 'Mark as spam')
+					}}
+				</ActionButton>
+				<ActionButton v-if="hasWriteAcl"
+					:close-after-click="true"
+					@click.prevent="onOpenTagModal">
+					<template #icon>
+						<TagIcon
+							:title="t('mail', 'Edit tags')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Edit tags') }}
+				</ActionButton>
+				<ActionButton v-if="withSelect"
+					:close-after-click="true"
+					@click.prevent="toggleSelected">
+					<template #icon>
+						<CheckIcon
+							:title="isSelected ? t('mail', 'Unselect') : t('mail', 'Select')"
+							:size="20" />
+					</template>
+					{{
+						isSelected ? t('mail', 'Unselect') : t('mail', 'Select')
+					}}
+				</ActionButton>
+				<ActionButton
+					v-if="hasDeleteAcl"
+					:close-after-click="true"
+					@click.prevent="onOpenMoveModal">
+					<template #icon>
+						<OpenInNewIcon
+							:title="t('mail', 'Move message')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Move message') }}
+				</ActionButton>
+				<ActionButton :close-after-click="false"
+					@click="moreActionsOpen=true">
+					<template #icon>
+						<DotsHorizontalIcon
+							:title="t('mail', 'More actions')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'More actions') }}
+				</ActionButton>
+			</template>
+			<template v-if="moreActionsOpen">
+				<ActionButton :close-after-click="false"
+					@click="moreActionsOpen=false">
+					<template #icon>
+						<ChevronLeft
+							:title="t('mail', 'More actions')"
+							:size="20" />
+						{{ t('mail', 'More actions') }}
+					</template>
+				</ActionButton>
+				<ActionButton :close-after-click="true"
+					@click.prevent="forwardSelectedAsAttachment">
+					<template #icon>
+						<ShareIcon
+							:title="t('mail', 'Forward message as attachment')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Forward message as attachment') }}
+				</ActionButton>
+				<ActionButton :close-after-click="true"
+					@click="onOpenEditAsNew">
+					<template #icon>
+						<PlusIcon
+							:title="t('mail', 'Edit as new message')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Edit as new message') }}
+				</ActionButton>
+				<ActionButton :close-after-click="true"
+					@click.prevent="showEventModal = true">
+					<template #icon>
+						<CalendarBlankIcon
+							:title="t('mail', 'Create event')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Create event') }}
+				</ActionButton>
+				<ActionButton v-if="withShowSource"
+					:close-after-click="true"
+					@click.prevent="onShowSourceModal">
+					<template #icon>
+						<InformationIcon
+							:title="t('mail', 'View source')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'View source') }}
+				</ActionButton>
+				<ActionLink
+					:close-after-click="true"
+					:href="exportMessageLink">
+					<template #icon>
+						<DownloadIcon :size="20" />
+					</template>
+					{{ t('mail', 'Download message') }}
+				</ActionLink>
+				<ActionLink v-if="debug"
+					:download="threadingFileName"
+					:href="threadingFile"
+					:close-after-click="true">
+					<template #icon>
+						<DownloadIcon
+							:title="t('mail', 'Download thread data for debugging')"
+							:size="20" />
+					</template>
+					{{ t('mail', 'Download thread data for debugging') }}
+				</ActionLink>
+			</template>
 		</Actions>
 		<Modal v-if="showSourceModal" class="source-modal" @close="onCloseSourceModal">
 			<div class="source-modal-content">
@@ -134,21 +199,29 @@
 
 <script>
 import axios from '@nextcloud/axios'
-import Actions from '@nextcloud/vue/dist/Components/Actions'
-import ActionButton from '@nextcloud/vue/dist/Components/ActionButton'
-import ActionLink from '@nextcloud/vue/dist/Components/ActionLink'
-import ActionRouter from '@nextcloud/vue/dist/Components/ActionRouter'
+import { NcActions as Actions, NcActionButton as ActionButton, NcActionLink as ActionLink, NcModal as Modal } from '@nextcloud/vue'
+import AlertOctagonIcon from 'vue-material-design-icons/AlertOctagon'
 import { Base64 } from 'js-base64'
 import { buildRecipients as buildReplyRecipients } from '../ReplyBuilder'
+import CalendarBlankIcon from 'vue-material-design-icons/CalendarBlank'
+import CheckIcon from 'vue-material-design-icons/Check'
+import ChevronLeft from 'vue-material-design-icons/ChevronLeft'
+import DotsHorizontalIcon from 'vue-material-design-icons/DotsHorizontal'
+import DownloadIcon from 'vue-material-design-icons/Download'
 import EventModal from './EventModal'
+import { mailboxHasRights } from '../util/acl'
 import { generateUrl } from '@nextcloud/router'
-import logger from '../logger'
-import { matchError } from '../errors/match'
-import Modal from '@nextcloud/vue/dist/Components/Modal'
-import TagModal from './TagModal'
+import InformationIcon from 'vue-material-design-icons/Information'
+import ImportantIcon from './icons/ImportantIcon'
 import MoveModal from './MoveModal'
-import NoTrashMailboxConfiguredError from '../errors/NoTrashMailboxConfiguredError'
-import { showError } from '@nextcloud/dialogs'
+import OpenInNewIcon from 'vue-material-design-icons/OpenInNew'
+import PlusIcon from 'vue-material-design-icons/Plus'
+import ReplyIcon from 'vue-material-design-icons/Reply'
+import ReplyAllIcon from 'vue-material-design-icons/ReplyAll'
+import ShareIcon from 'vue-material-design-icons/Share'
+
+import TagIcon from 'vue-material-design-icons/Tag'
+import TagModal from './TagModal'
 
 export default {
 	name: 'MenuEnvelope',
@@ -156,11 +229,24 @@ export default {
 		Actions,
 		ActionButton,
 		ActionLink,
-		ActionRouter,
+		AlertOctagonIcon,
+		CalendarBlankIcon,
+		ChevronLeft,
+		CheckIcon,
+		DotsHorizontalIcon,
+		DownloadIcon,
 		EventModal,
+		InformationIcon,
 		Modal,
 		MoveModal,
+		OpenInNewIcon,
+		PlusIcon,
+		ReplyIcon,
+		ReplyAllIcon,
+		ShareIcon,
+		TagIcon,
 		TagModal,
+		ImportantIcon,
 	},
 	props: {
 		envelope: {
@@ -169,10 +255,9 @@ export default {
 			required: true,
 		},
 		mailbox: {
-			// It is just used to get the accountId when envelope doesn't have it
+			// Required for checking ACLs
 			type: Object,
-			required: false,
-			default: undefined,
+			required: true,
 		},
 		isSelected: {
 			// Indicates if the envelope is currently selected
@@ -200,11 +285,12 @@ export default {
 		return {
 			debug: window?.OC?.debug || false,
 			rawMessage: '', // Will hold the raw source of the message when requested
-			sourceLoading: false,
 			showSourceModal: false,
 			showMoveModal: false,
 			showEventModal: false,
 			showTagModal: false,
+			moreActionsOpen: false,
+			forwardMessages: this.envelope.databaseId,
 		}
 	},
 	computed: {
@@ -224,45 +310,6 @@ export default {
 			})
 			return recipients.to.concat(recipients.cc).length > 1
 		},
-		replyOneLink() {
-			return {
-				name: 'message',
-				params: {
-					mailboxId: this.$route.params.mailboxId,
-					threadId: 'reply',
-					filter: this.$route.params.filter ? this.$route.params.filter : undefined,
-				},
-				query: {
-					messageId: this.envelope.databaseId,
-				},
-			}
-		},
-		replyAllLink() {
-			return {
-				name: 'message',
-				params: {
-					mailboxId: this.$route.params.mailboxId,
-					threadId: 'replyAll',
-					filter: this.$route.params.filter ? this.$route.params.filter : undefined,
-				},
-				query: {
-					messageId: this.envelope.databaseId,
-				},
-			}
-		},
-		forwardLink() {
-			return {
-				name: 'message',
-				params: {
-					mailboxId: this.$route.params.mailboxId,
-					threadId: 'new',
-					filter: this.$route.params.filter ? this.$route.params.filter : undefined,
-				},
-				query: {
-					messageId: this.envelope.databaseId,
-				},
-			}
-		},
 		threadingFile() {
 			return `data:text/plain;base64,${Base64.encode(JSON.stringify({
 				subject: this.envelope.subject,
@@ -275,16 +322,43 @@ export default {
 		threadingFileName() {
 			return `${this.envelope.databaseId}.json`
 		},
-		iconFavorite() {
-			return this.envelope.flags.flagged ? 'icon-favorite' : 'icon-starred'
+		showFavoriteIconVariant() {
+			return this.envelope.flags.flagged
+		},
+		showImportantIconVariant() {
+			return this.envelope.flags.seen
 		},
 		isImportant() {
 			return this.$store.getters
 				.getEnvelopeTags(this.envelope.databaseId)
 				.some((tag) => tag.imapLabel === '$label1')
 		},
+		/**
+		 * Link to download the whole message (.eml).
+		 *
+		 * @return {string}
+		 */
+		exportMessageLink() {
+			return generateUrl('/apps/mail/api/messages/{id}/export', {
+				id: this.envelope.databaseId,
+			})
+		},
+		hasWriteAcl() {
+			return mailboxHasRights(this.mailbox, 'w')
+		},
+		hasDeleteAcl() {
+			return mailboxHasRights(this.mailbox, 'te')
+		},
 	},
 	methods: {
+		onForward() {
+			this.$store.dispatch('showMessageComposer', {
+				reply: {
+					mode: 'forward',
+					data: this.envelope,
+				},
+			})
+		},
 		onToggleFlagged() {
 			this.$store.dispatch('toggleEnvelopeFlagged', this.envelope)
 		},
@@ -300,48 +374,21 @@ export default {
 		toggleSelected() {
 			this.$emit('update:selected')
 		},
-		async onDelete() {
-			// Remove from selection first
-			if (this.withSelect) {
-				this.$emit('unselect')
-			}
-
-			// Delete
-			this.$emit('delete', this.envelope.databaseId)
-
-			logger.info(`deleting message ${this.envelope.databaseId}`)
-
-			try {
-				await this.$store.dispatch('deleteMessage', {
-					id: this.envelope.databaseId,
-				})
-			} catch (error) {
-				showError(await matchError(error, {
-					[NoTrashMailboxConfiguredError.getName()]() {
-						return t('mail', 'No trash mailbox configured')
-					},
-					default(error) {
-						logger.error('could not delete message', error)
-						return t('mail', 'Could not delete message')
-					},
-				}))
-			}
+		async forwardSelectedAsAttachment() {
+			this.forwardedMessages = [this.envelope.databaseId]
+			await this.$store.dispatch('showMessageComposer', {
+				forwardedMessages: this.forwardedMessages,
+			})
 		},
 		async onShowSourceModal() {
-			this.sourceLoading = true
+			const resp = await axios.get(
+				generateUrl('/apps/mail/api/messages/{id}/source', {
+					id: this.envelope.databaseId,
+				})
+			)
 
-			try {
-				const resp = await axios.get(
-					generateUrl('/apps/mail/api/messages/{id}/source', {
-						id: this.envelope.databaseId,
-					})
-				)
-
-				this.rawMessage = resp.data.source
-				this.showSourceModal = true
-			} finally {
-				this.sourceLoading = false
-			}
+			this.rawMessage = resp.data.source
+			this.showSourceModal = true
 		},
 		onCloseSourceModal() {
 			this.showSourceModal = false
@@ -361,15 +408,29 @@ export default {
 		onOpenTagModal() {
 			this.showTagModal = true
 		},
+		onReply(onlySender = false) {
+			this.$store.dispatch('showMessageComposer', {
+				reply: {
+					mode: onlySender ? 'reply' : 'replyAll',
+					data: this.envelope,
+				},
+			})
+		},
 		onCloseTagModal() {
 			this.showTagModal = false
+		},
+		async onOpenEditAsNew() {
+			await this.$store.dispatch('showMessageComposer', {
+				templateMessageId: this.envelope.databaseId,
+				data: this.envelope,
+			})
 		},
 	},
 }
 </script>
 <style lang="scss" scoped>
 	.source-modal {
-		::v-deep .modal-container {
+		:deep(.modal-container) {
 			height: 800px;
 		}
 
@@ -379,4 +440,5 @@ export default {
 			overflow-y: scroll !important;
 		}
 	}
+
 </style>

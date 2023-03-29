@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * @copyright 2021 Richard Steinmetz <richard@steinmetz.cloud>
  *
@@ -39,7 +41,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class SyncServiceTest extends TestCase {
-
 	/** @var ImapToDbSynchronizer */
 	private $synchronizer;
 
@@ -113,7 +114,7 @@ class SyncServiceTest extends TestCase {
 			[],
 			[],
 			[],
-			new MailboxStats(42, 10)
+			new MailboxStats(42, 10, null)
 		);
 
 		$this->messageMapper

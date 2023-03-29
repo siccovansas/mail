@@ -1,11 +1,12 @@
 <template>
 	<div>
-		<router-link to="/setup" class="icon-add-white app-settings-button button primary new-button">
+		<router-link v-if="allowNewMailAccounts" to="/setup" class="app-settings-button button primary new-button">
+			<IconAdd :size="20" />
 			{{ t('mail', 'Add mail account') }}
 		</router-link>
 
 		<p v-if="loadingOptOutSettings" class="app-settings">
-			<span class="icon-loading-small" />
+			<IconLoading :size="20" />
 			{{ optOutSettingsText }}
 		</p>
 		<p v-else class="app-settings">
@@ -19,7 +20,7 @@
 		</p>
 
 		<p v-if="toggleAutoTagging" class="app-settings">
-			<span class="icon-loading-small" />
+			<IconLoading :size="20" />
 			{{ autoTaggingText }}
 		</p>
 		<p v-else class="app-settings">
@@ -33,7 +34,7 @@
 		</p>
 
 		<p v-if="loadingAvatarSettings" class="app-settings avatar-settings">
-			<span class="icon-loading-small" />
+			<IconLoading :size="20" />
 			{{ t('mail', 'Use Gravatar and favicon avatars') }}
 		</p>
 		<p v-else class="app-settings">
@@ -47,7 +48,7 @@
 		</p>
 
 		<p v-if="loadingReplySettings" class="app-settings reply-settings">
-			<span class="icon-loading-small" />
+			<IconLoading :size="20" />
 			{{ replySettingsText }}
 		</p>
 		<p v-else class="app-settings">
@@ -61,18 +62,46 @@
 		</p>
 
 		<p>
-			<button class="icon-mail app-settings-button" @click="registerProtocolHandler">
+			<ButtonVue type="secondary" class="app-settings-button" @click="registerProtocolHandler">
+				<template #icon>
+					<IconEmail :size="20" />
+				</template>
 				{{ t('mail', 'Register as application for mail links') }}
-			</button>
+			</ButtonVue>
 		</p>
 
-		<button
-			class="icon-details app-settings-button"
+		<ButtonVue
+			class="app-settings-button"
+			type="secondary"
 			@click.prevent.stop="showKeyboardShortcuts"
 			@shortkey="toggleKeyboardShortcuts">
+			<template #icon>
+				<IconInfo :size="20" />
+			</template>
 			{{ t('mail', 'Show keyboard shortcuts') }}
-		</button>
+		</ButtonVue>
 		<KeyboardShortcuts v-if="displayKeyboardShortcuts" @close="closeKeyboardShortcuts" />
+
+		<ButtonVue class="app-settings-button"
+			type="secondary"
+			@click.prevent.stop="displaySmimeCertificateModal = true">
+			<template #icon>
+				<IconLock :size="20" />
+			</template>
+			{{ t('mail', 'Manage S/MIME certificates') }}
+		</ButtonVue>
+		<SmimeCertificateModal v-if="displaySmimeCertificateModal"
+			@close="displaySmimeCertificateModal = false" />
+
+		<p class="mailvelope-section">
+			{{ t('mail', 'Looking for a way to encrypt your emails?') }}
+		</p>
+		<a
+			href="https://www.mailvelope.com/"
+			target="_blank"
+			rel="noopener noreferrer">
+			{{ t('mail', 'Install Mailvelope browser extension here') }}
+		</a>
 	</div>
 </template>
 
@@ -80,13 +109,27 @@
 import { generateUrl } from '@nextcloud/router'
 import { showError } from '@nextcloud/dialogs'
 
+import { NcButton as ButtonVue, NcLoadingIcon as IconLoading } from '@nextcloud/vue'
+
+import IconInfo from 'vue-material-design-icons/Information'
+import IconAdd from 'vue-material-design-icons/Plus'
+import IconEmail from 'vue-material-design-icons/Email'
+import IconLock from 'vue-material-design-icons/Lock'
 import Logger from '../logger'
 import KeyboardShortcuts from '../views/KeyboardShortcuts'
+import SmimeCertificateModal from './smime/SmimeCertificateModal'
 
 export default {
 	name: 'AppSettingsMenu',
 	components: {
+		ButtonVue,
 		KeyboardShortcuts,
+		IconInfo,
+		IconEmail,
+		IconAdd,
+		IconLoading,
+		IconLock,
+		SmimeCertificateModal,
 	},
 	data() {
 		return {
@@ -101,6 +144,7 @@ export default {
 			// eslint-disable-next-line
 			autoTaggingText: t('mail', 'Automatically classify importance of new email'),
 			toggleAutoTagging: false,
+			displaySmimeCertificateModal: false,
 		}
 	},
 	computed: {
@@ -115,6 +159,9 @@ export default {
 		},
 		useAutoTagging() {
 			return this.$store.getters.getPreference('tag-classified-messages', 'true') === 'true'
+		},
+		allowNewMailAccounts() {
+			return this.$store.getters.getPreference('allow-new-accounts', true)
 		},
 	},
 	methods: {
@@ -207,8 +254,8 @@ export default {
 }
 </script>
 
-<style scoped>
-p.app-settings span.icon-loading-small {
+<style lang="scss" scoped>
+p.app-settings span.loading-icon {
 	display: inline-block;
 	vertical-align: middle;
 	padding: 5px 0;
@@ -217,16 +264,41 @@ p.app-settings {
 	padding: 10px 0;
 }
 .app-settings-button {
-	display: block;
-
-	padding-left: 34px;
+	display: inline-flex;
 	background-position: 10px center;
 	text-align: left;
+	margin-top: 6px;
 }
 .app-settings-button.button.primary.new-button {
 	color: var(--color-main-background);
+	//this style will be removed after we migrate also the  'add mail account' to material design
+	padding-left: 34px;
+	gap: 4px;
 }
 .app-settings-link {
 	text-decoration: underline;
+}
+.mailvelope-section {
+	padding-top: 15px;
+
+	a.button {
+		display: flex;
+		align-items: center;
+		line-height: normal;
+		min-height: 44px;
+		font-size: unset;
+
+		&:focus-visible,
+		&:hover {
+			box-shadow: 0 0 0 1px var(--color-primary-element);
+		}
+	}
+}
+.material-design-icon {
+	opacity: .7;
+	&.lock-icon {
+		margin-right: 10px;
+	}
+
 }
 </style>

@@ -26,15 +26,17 @@ declare(strict_types=1);
 namespace OCA\Mail\Settings;
 
 use OCA\Mail\AppInfo\Application;
+use OCA\Mail\Integration\GoogleIntegration;
+use OCA\Mail\Integration\MicrosoftIntegration;
 use OCA\Mail\Service\AntiSpamService;
 use OCA\Mail\Service\Provisioning\Manager as ProvisioningManager;
 use OCP\AppFramework\Http\TemplateResponse;
+use OCP\IConfig;
 use OCP\IInitialStateService;
 use OCP\LDAP\ILDAPProvider;
 use OCP\Settings\ISettings;
 
 class AdminSettings implements ISettings {
-
 	/** @var IInitialStateService */
 	private $initialStateService;
 
@@ -44,12 +46,22 @@ class AdminSettings implements ISettings {
 	/** @var AntiSpamService */
 	private $antiSpamService;
 
+	private GoogleIntegration $googleIntegration;
+	private MicrosoftIntegration $microsoftIntegration;
+	private IConfig $config;
+
 	public function __construct(IInitialStateService $initialStateService,
 								ProvisioningManager $provisioningManager,
-								AntiSpamService $antiSpamService) {
+								AntiSpamService $antiSpamService,
+								GoogleIntegration $googleIntegration,
+								MicrosoftIntegration $microsoftIntegration,
+								IConfig $config) {
 		$this->initialStateService = $initialStateService;
 		$this->provisioningManager = $provisioningManager;
 		$this->antiSpamService = $antiSpamService;
+		$this->googleIntegration = $googleIntegration;
+		$this->microsoftIntegration = $microsoftIntegration;
+		$this->config = $config;
 	}
 
 	public function getForm() {
@@ -68,13 +80,43 @@ class AdminSettings implements ISettings {
 			]
 		);
 
-
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'allow_new_mail_accounts',
+			$this->config->getAppValue('mail', 'allow_new_mail_accounts', 'yes') === 'yes'
+		);
 		$this->initialStateService->provideLazyInitialState(
 			Application::APP_ID,
 			'ldap_aliases_integration',
-			function () {
+			static function () {
 				return method_exists(ILDAPProvider::class, 'getMultiValueUserAttribute');
 			}
+		);
+
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'google_oauth_client_id',
+			$this->googleIntegration->getClientId(),
+		);
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'google_oauth_redirect_url',
+			$this->googleIntegration->getRedirectUrl(),
+		);
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'microsoft_oauth_tenant_id',
+			$this->microsoftIntegration->getTenantId(),
+		);
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'microsoft_oauth_client_id',
+			$this->microsoftIntegration->getClientId(),
+		);
+		$this->initialStateService->provideInitialState(
+			Application::APP_ID,
+			'microsoft_oauth_redirect_url',
+			$this->microsoftIntegration->getRedirectUrl(),
 		);
 
 		return new TemplateResponse(Application::APP_ID, 'settings-admin');

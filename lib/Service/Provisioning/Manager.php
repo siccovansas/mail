@@ -34,6 +34,7 @@ use OCA\Mail\Db\TagMapper;
 use OCA\Mail\Exception\ValidationException;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
+use OCP\ICacheFactory;
 use OCP\IUser;
 use OCP\IUserManager;
 use OCP\LDAP\ILDAPProvider;
@@ -42,7 +43,6 @@ use OCP\Security\ICrypto;
 use Psr\Log\LoggerInterface;
 
 class Manager {
-
 	/** @var IUserManager */
 	private $userManager;
 
@@ -67,6 +67,9 @@ class Manager {
 	/** @var TagMapper */
 	private $tagMapper;
 
+	/** @var ICacheFactory */
+	private $cacheFactory;
+
 	public function __construct(IUserManager $userManager,
 								ProvisioningMapper $provisioningMapper,
 								MailAccountMapper $mailAccountMapper,
@@ -74,7 +77,8 @@ class Manager {
 								ILDAPProviderFactory $ldapProviderFactory,
 								AliasMapper $aliasMapper,
 								LoggerInterface $logger,
-								TagMapper $tagMapper) {
+								TagMapper $tagMapper,
+								ICacheFactory $cacheFactory) {
 		$this->userManager = $userManager;
 		$this->provisioningMapper = $provisioningMapper;
 		$this->mailAccountMapper = $mailAccountMapper;
@@ -83,6 +87,7 @@ class Manager {
 		$this->aliasMapper = $aliasMapper;
 		$this->logger = $logger;
 		$this->tagMapper = $tagMapper;
+		$this->cacheFactory = $cacheFactory;
 	}
 
 	public function getConfigById(int $provisioningId): ?Provisioning {
@@ -90,7 +95,21 @@ class Manager {
 	}
 
 	public function getConfigs(): array {
-		return $this->provisioningMapper->getAll();
+		$cache = null;
+		if ($this->cacheFactory->isLocalCacheAvailable()) {
+			$cache = $this->cacheFactory->createLocal('provisionings');
+			$cached = $cache->get('provisionings_all');
+			if ($cached !== null) {
+				return unserialize($cached, ['allowed_classes' => [Provisioning::class]]);
+			}
+		}
+
+		$provisionings = $this->provisioningMapper->getAll();
+		// let's cache the provisionings for 5 minutes
+		if ($this->cacheFactory->isLocalCacheAvailable()) {
+			$cache->set('provisionings_all', serialize($provisionings), 60 * 5);
+		}
+		return $provisionings;
 	}
 
 	public function provision(): int {
@@ -110,12 +129,7 @@ class Manager {
 	 * A alias is orphaned if not listed in newAliases anymore
 	 * (=> the provisioning configuration does contain it anymore)
 	 *
-	 * Exception for Nextcloud 20: \Doctrine\DBAL\DBALException
-	 * Exception for Nextcloud 21 and newer: \OCP\DB\Exception
-	 *
-	 * @TODO: Change throws to \OCP\DB\Exception once Mail requires Nextcloud 21 or above
-	 *
-	 * @throws \Exception
+	 * @throws \OCP\DB\Exception
 	 */
 	private function deleteOrphanedAliases(string $userId, int $accountId, array $newAliases): void {
 		$existingAliases = $this->aliasMapper->findAll($accountId, $userId);
@@ -129,15 +143,14 @@ class Manager {
 	/**
 	 * Create new aliases for the given account.
 	 *
-	 * Exception for Nextcloud 20: \Doctrine\DBAL\DBALException
-	 * Exception for Nextcloud 21 and newer: \OCP\DB\Exception
-	 *
-	 * @TODO: Change throws to \OCP\DB\Exception once Mail requires Nextcloud 21 or above
-	 *
-	 * @throws \Exception
+	 * @throws \OCP\DB\Exception
 	 */
-	private function createNewAliases(string $userId, int $accountId, array $newAliases, string $displayName): void {
+	private function createNewAliases(string $userId, int $accountId, array $newAliases, string $displayName, string $accountEmail): void {
 		foreach ($newAliases as $newAlias) {
+			if ($newAlias === $accountEmail) {
+				continue; // skip alias when identical to account email
+			}
+
 			try {
 				$this->aliasMapper->findByAlias($newAlias, $userId);
 			} catch (DoesNotExistException $e) {
@@ -226,7 +239,7 @@ class Manager {
 			}
 
 			try {
-				$this->createNewAliases($user->getUID(), $mailAccount->getId(), $provisioning->getAliases(), $user->getDisplayName());
+				$this->createNewAliases($user->getUID(), $mailAccount->getId(), $provisioning->getAliases(), $user->getDisplayName(), $mailAccount->getEmail());
 			} catch (\Throwable $e) {
 				$this->logger->warning('Creating new aliases failed', ['exception' => $e]);
 			}
@@ -237,16 +250,16 @@ class Manager {
 
 	/**
 	 * @throws ValidationException
-	 * @throws \Exception
+	 * @throws \OCP\DB\Exception
 	 */
-	public function newProvisioning(array $data): void {
+	public function newProvisioning(array $data): Provisioning {
 		$provisioning = $this->provisioningMapper->validate($data);
-		$this->provisioningMapper->insert($provisioning);
+		return $this->provisioningMapper->insert($provisioning);
 	}
 
 	/**
 	 * @throws ValidationException
-	 * @throws \Exception
+	 * @throws \OCP\DB\Exception
 	 */
 	public function updateProvisioning(array $data): void {
 		$provisioning = $this->provisioningMapper->validate($data);

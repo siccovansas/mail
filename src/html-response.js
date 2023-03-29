@@ -3,7 +3,7 @@
  *
  * @author 2020 Richard Steinmetz <richard@steinmetz.cloud>
  *
- * @license GNU AGPL version 3 or any later version
+ * @license AGPL-3.0-or-later
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
  */
 
 // injected styles
@@ -24,3 +25,12 @@ import '../css/html-response.css'
 
 // iframe-resizer client script
 import 'iframe-resizer/js/iframeResizer.contentWindow.js'
+
+// Fix width of some newsletter mails
+document.addEventListener('DOMContentLoaded', function() {
+	for (const el of document.querySelectorAll('*')) {
+		if (!el.style['max-width']) {
+			el.style['max-width'] = '100%'
+		}
+	}
+})

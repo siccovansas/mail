@@ -28,10 +28,10 @@ use Exception;
 use Horde_Mail_Rfc822_Address;
 use OCA\Mail\Vendor\Favicon\Favicon;
 use OCP\Files\IMimeTypeDetector;
+use OCP\Security\IRemoteHostValidator;
 use OCP\Http\Client\IClientService;
 
 class FaviconSource implements IAvatarSource {
-
 	/** @var IClientService */
 	private $clientService;
 
@@ -40,14 +40,17 @@ class FaviconSource implements IAvatarSource {
 
 	/** @var IMimeTypeDetector */
 	private $mimeDetector;
+	private IRemoteHostValidator $remoteHostValidator;
 
 	public function __construct(IClientService $clientService,
 								Favicon $favicon,
-								IMimeTypeDetector $mimeDetector) {
+								IMimeTypeDetector $mimeDetector,
+								IRemoteHostValidator $remoteHostValidator) {
 		$this->clientService = $clientService;
 		$this->favicon = $favicon;
 		$this->favicon->setCacheTimeout(0);
 		$this->mimeDetector = $mimeDetector;
+		$this->remoteHostValidator = $remoteHostValidator;
 	}
 
 	/**
@@ -69,6 +72,9 @@ class FaviconSource implements IAvatarSource {
 		// TODO: fall back to insecure HTTP?
 		$domain = 'https://' . $horde->host;
 
+		if (!$this->remoteHostValidator->isValid($domain)) {
+			return null;
+		}
 		$iconUrl = $this->favicon->get($domain);
 
 		if ($iconUrl === false || empty($iconUrl)) {

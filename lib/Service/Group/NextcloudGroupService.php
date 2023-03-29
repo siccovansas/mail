@@ -29,7 +29,6 @@ use OCP\IGroupManager;
 use OCA\Mail\Exception\ServiceException;
 
 class NextcloudGroupService implements IGroupService {
-
 	/**
 	 * Nextcloud's group manager
 	 *
@@ -65,7 +64,7 @@ class NextcloudGroupService implements IGroupService {
 		$groups = $this->groupManager->search($term);
 
 		return array_map(
-			function ($g) {
+			static function ($g) {
 				return [
 					'id' => $g->getGID(),
 					'name' => $g->getDisplayName()
@@ -81,7 +80,7 @@ class NextcloudGroupService implements IGroupService {
 		}
 		$users = $this->groupManager->get($groupId)->getUsers();
 		return array_map(
-			function ($user) {
+			static function ($user) {
 				return [
 					'id' => $user->getUID(),
 					'name' => $user->getDisplayName(),

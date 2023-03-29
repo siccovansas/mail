@@ -30,7 +30,6 @@ use OCP\Migration\SimpleMigrationStep;
 use OCP\Migration\IOutput;
 
 class Version0156Date20190828140357 extends SimpleMigrationStep {
-
 	/**
 	 * @param IOutput $output
 	 * @param Closure $schemaClosure The `\Closure` returns a `ISchemaWrapper`
@@ -77,8 +76,7 @@ class Version0156Date20190828140357 extends SimpleMigrationStep {
 			'length' => 4,
 		]);
 		$mailboxTable->addColumn('selectable', 'boolean', [
-			'notnull' => true,
-			'length' => 1,
+			'notnull' => false,
 			'default' => true,
 		]);
 		// We allow each mailbox name just once

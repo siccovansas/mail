@@ -26,12 +26,12 @@ declare(strict_types=1);
 namespace OCA\Mail\IMAP\Threading;
 
 use JsonSerializable;
+use ReturnTypeWillChange;
 use function array_map;
 use function array_merge;
 use function json_decode;
 
 class DatabaseMessage extends Message implements JsonSerializable {
-
 	/** @var int */
 	private $databaseId;
 
@@ -97,18 +97,20 @@ class DatabaseMessage extends Message implements JsonSerializable {
 			$this->databaseId,
 			$this->hasReSubject() ? "Re: " . $hash($this->getSubject()) : $hash($this->getSubject()),
 			$hash($this->getId()),
-			array_map(function (string $ref) use ($hash) {
+			array_map(static function (string $ref) use ($hash) {
 				return $hash($ref);
 			}, $this->getReferences()),
 			$this->threadRootId === null ? null : $hash($this->threadRootId)
 		);
 	}
 
-	public function jsonSerialize(): array {
+	#[ReturnTypeWillChange]
+	public function jsonSerialize() {
 		return array_merge(
 			parent::jsonSerialize(),
 			[
 				'databaseId' => $this->databaseId,
+				'threadRootId' => $this->getThreadRootId(),
 			]
 		);
 	}

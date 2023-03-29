@@ -36,6 +36,9 @@ use OCP\EventDispatcher\IEventListener;
 use function array_chunk;
 use function iterator_to_array;
 
+/**
+ * @template-implements IEventListener<Event|SynchronizationEvent>
+ */
 class AccountSynchronizedThreadUpdaterListener implements IEventListener {
 	private const WRITE_IDS_CHUNK_SIZE = 500;
 
@@ -56,11 +59,16 @@ class AccountSynchronizedThreadUpdaterListener implements IEventListener {
 			// Unrelated
 			return;
 		}
+		$logger = $event->getLogger();
+		if (!$event->isRebuildThreads()) {
+			$event->getLogger()->debug('Skipping threading as there were no significant changes');
+			return;
+		}
 
 		$accountId = $event->getAccount()->getId();
-		$logger = $event->getLogger();
+		$logger->debug("Building threads for account $accountId");
 		$messages = $this->mapper->findThreadingData($event->getAccount());
-		$logger->debug("Account $accountId has " . count($messages) . " messages for threading");
+		$logger->debug("Account $accountId has " . count($messages) . " messages with threading information");
 		$threads = $this->builder->build($messages, $logger);
 		$logger->debug("Account $accountId has " . count($threads) . " threads");
 		/** @var DatabaseMessage[] $flattened */
@@ -97,7 +105,7 @@ class AccountSynchronizedThreadUpdaterListener implements IEventListener {
 
 			yield from $this->flattenThreads(
 				$thread->getChildren(),
-				$threadId ?? ($message === null ? null : $message->getId())
+				$threadId ?? ($message === null ? $thread->getId() : $message->getId())
 			);
 		}
 	}

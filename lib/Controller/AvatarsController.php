@@ -24,6 +24,7 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Controller;
 
+use OCA\Mail\Http\TrapError;
 use OCA\Mail\Contracts\IAvatarService;
 use OCA\Mail\Http\AvatarDownloadResponse;
 use OCP\AppFramework\Controller;
@@ -33,12 +34,8 @@ use OCP\AppFramework\Http\Response;
 use OCP\IRequest;
 
 class AvatarsController extends Controller {
-
-	/** @var IAvatarService */
-	private $avatarService;
-
-	/** @var string */
-	private $uid;
+	private IAvatarService $avatarService;
+	private string $uid;
 
 	public function __construct(string $appName,
 								IRequest $request,
@@ -53,11 +50,11 @@ class AvatarsController extends Controller {
 	/**
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
-	 * @TrapError
 	 *
 	 * @param string $email
 	 * @return JSONResponse
 	 */
+	#[TrapError]
 	public function url(string $email): JSONResponse {
 		if (empty($email)) {
 			return new JSONResponse([], Http::STATUS_BAD_REQUEST);
@@ -74,7 +71,7 @@ class AvatarsController extends Controller {
 
 			// Debounce this a bit
 			// (cache for one day)
-			$response->cacheFor(24 * 60 * 60);
+			$response->cacheFor(24 * 60 * 60, false, true);
 
 			return $response;
 		}
@@ -82,7 +79,7 @@ class AvatarsController extends Controller {
 		$response = new JSONResponse($avatar);
 
 		// Let the browser cache this for a week
-		$response->cacheFor(7 * 24 * 60 * 60);
+		$response->cacheFor(7 * 24 * 60 * 60, false, true);
 
 		return $response;
 	}
@@ -90,11 +87,11 @@ class AvatarsController extends Controller {
 	/**
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
-	 * @TrapError
 	 *
 	 * @param string $email
 	 * @return Response
 	 */
+	#[TrapError]
 	public function image(string $email): Response {
 		if (empty($email)) {
 			return new JSONResponse([], Http::STATUS_BAD_REQUEST);
@@ -112,7 +109,7 @@ class AvatarsController extends Controller {
 		$resp->addHeader('Content-Type', $avatar->getMime());
 
 		// Let the browser cache this for a week
-		$resp->cacheFor(7 * 24 * 60 * 60);
+		$resp->cacheFor(7 * 24 * 60 * 60, false, true);
 
 		return $resp;
 	}

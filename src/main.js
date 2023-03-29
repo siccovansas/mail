@@ -3,7 +3,9 @@
  *
  * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  *
- * @license GNU AGPL version 3 or any later version
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
+ *
+ * @license AGPL-3.0-or-later
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,10 +26,10 @@ import Vue from 'vue'
 import { getRequestToken } from '@nextcloud/auth'
 import { sync } from 'vuex-router-sync'
 import { generateFilePath } from '@nextcloud/router'
-import '@nextcloud/dialogs/styles/toast.scss'
+import '@nextcloud/dialogs/dist/index.css'
 import './directives/drag-and-drop/styles/drag-and-drop.scss'
 import VueShortKey from 'vue-shortkey'
-import VTooltip from 'v-tooltip'
+import vToolTip from 'v-tooltip'
 
 import App from './App'
 import Nextcloud from './mixins/Nextcloud'
@@ -45,8 +47,8 @@ sync(store, router)
 
 Vue.mixin(Nextcloud)
 
-Vue.use(VueShortKey, { prevent: ['input', 'div'] })
-Vue.use(VTooltip)
+Vue.use(VueShortKey, { prevent: ['input', 'div', 'textarea'] })
+Vue.use(vToolTip)
 
 const getPreferenceFromPage = (key) => {
 	const elem = document.getElementById(key)
@@ -59,6 +61,10 @@ const getPreferenceFromPage = (key) => {
 store.commit('savePreference', {
 	key: 'debug',
 	value: loadState('mail', 'debug', false),
+})
+store.commit('savePreference', {
+	key: 'ncVersion',
+	value: loadState('mail', 'ncVersion'),
 })
 store.commit('savePreference', {
 	key: 'attachment-size-limit',
@@ -76,14 +82,31 @@ store.commit('savePreference', {
 	key: 'collect-data',
 	value: getPreferenceFromPage('collect-data'),
 })
+const startMailboxId = getPreferenceFromPage('start-mailbox-id')
+store.commit('savePreference', {
+	key: 'start-mailbox-id',
+	value: startMailboxId ? parseInt(startMailboxId, 10) : null,
+})
 store.commit('savePreference', {
 	key: 'tag-classified-messages',
 	value: getPreferenceFromPage('tag-classified-messages'),
+})
+store.commit('savePreference', {
+	key: 'allow-new-accounts',
+	value: loadState('mail', 'allow-new-accounts', true),
+})
+store.commit('savePreference', {
+	key: 'password-is-unavailable',
+	value: loadState('mail', 'password-is-unavailable', false),
 })
 
 const accountSettings = loadState('mail', 'account-settings')
 const accounts = loadState('mail', 'accounts', [])
 const tags = loadState('mail', 'tags', [])
+const outboxMessages = loadState('mail', 'outbox-messages')
+const disableScheduledSend = loadState('mail', 'disable-scheduled-send')
+const googleOauthUrl = loadState('mail', 'google-oauth-url', null)
+const microsoftOauthUrl = loadState('mail', 'microsoft-oauth-url', null)
 
 accounts.map(fixAccountId).forEach((account) => {
 	const settings = accountSettings.find(settings => settings.accountId === account.id)
@@ -101,6 +124,15 @@ accounts.map(fixAccountId).forEach((account) => {
 })
 
 tags.forEach(tag => store.commit('addTag', { tag }))
+
+outboxMessages.forEach(message => store.commit('outbox/addMessage', { message }))
+
+store.commit('setScheduledSendingDisabled', disableScheduledSend)
+store.commit('setGoogleOauthUrl', googleOauthUrl)
+store.commit('setMicrosoftOauthUrl', microsoftOauthUrl)
+
+const smimeCertificates = loadState('mail', 'smime-certificates', [])
+store.commit('setSmimeCertificates', smimeCertificates)
 
 export default new Vue({
 	el: '#content',

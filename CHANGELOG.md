@@ -1,6 +1,385 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## 2.2.3 - 2023-02-09
+### Fixed
+- Allow sending of messages with empty body content
+- Check if  is empty before trying to make it an iterator
+- ProvisioningMiddleware method return type
+- Select correct account/alias when opening messages
+- Unread counter position for outbox
+
+## 2.2.2 – 2022-12-21
+### Fixed
+- Validate remote hosts
+- Sending password for OAUTH accounts
+- Storing password when we don't expect one
+- Check for quoted-printable transfer encoding and decode messages before parsing html
+
+## 2.2.1 – 2022-12-06
+### Fixed
+- Mailbox cache sync scope of current mailbox
+
+## 2.2.0 - 2022-12-05
+### Added
+- Google OAuth support
+- Skeleton for thread
+- Make HTML body loading a single step experience
+- Refactor HTML body element ID to class
+- Give thread messages a minimum height
+- Show thread subject while loading thread messages
+- Local Draft Handling Backend
+- Search box for outbox and PI
+- Support for email field
+### Fixed
+- Advanced search does not scroll
+- Dark theme loading envelops and thread colour
+- Scrolling for long threads on narrow screens
+- Replace emptycontent div with EmptyContent vue component
+- Drop right border from navigation header
+- Saving provisioning and anti-spam settings
+- Don't decode content for preview twice
+- Broken encoding for outgoing messages
+- Add empty content for loading thread
+- Improve the size of padding bottom
+- Provisioning config not saving
+- Sending PGP messages as HTML
+- Copy to clipboard
+- Envelope and message previews showing PGP ciphertext
+- Double scrollbar in thread view
+- Alias provisioning: Skip alias when identical to account email
+- Improve the dropdown multiselect menu of default folders
+- XOAUTH2 auth via SMTP
+- Disable provisioned accounts if using passwordless authentication
+- Dragover indicator being inherited to children
+
+### Changed
+- Remove loading icons when refreshing
+- Migrate Vuex actions from promises to async-await
+- Update app screenshot to match Nextcloud 25 design
+- Don't collapse if threading has one message only
+- Increase the clicable area on envelope thread
+
+## 2.1.4 - 2022-11-30
+### Fixed
+- Show all mailboxes
+
+## 2.1.3 – 2022-11-29
+### Fixed
+- Show only existing mailboxes, not all subscribed mailboxes
+- Scrolling for long threads on narrow screens
+- XOAUTH2 auth via SMTP
+
+## 2.1.2 – 2022-11-22
+### Fixed
+- Don't collapse if threading has one message only
+- Saving provisioning and anti-spam settings
+- Undefined errorMessage in ThreadEnvelope
+- Server error accessing message routes anonymously
+
+## 2.1.1 – 2022-11-14
+### Fixed
+- Improve the size of padding bottom on threads
+- Don't decode content for preview twice
+- Broken encoding for outgoing messages
+- Provisioning config not saving
+- Envelope and message previews showing PGP ciphertext
+- Sending PGP messages as HTML
+- Copy to clipboard
+- Double scrollbar in thread view
+
+## 2.1.0 – 2022-11-03
+### Added
+- Hide important section when no important messages
+- Basic messages filter and search
+- Skeleton for loading state
+- Implement archive functionality
+- Add the option to disable the new account button
+- Implement IAPIWidget
+- Implement IIconWidget and IOptionWidget interfaces
+### Fixed
+- Signature above quote
+- Background for default folders
+- Loading-refresh-icon
+- Disabling the add account button
+- Keyboard button misalignment
+- Scrolling on small screen
+- Empty content when opening drafts
+- Transfer encoding issue
+
+## 2.0.3 – 2022-10-18
+### Fixed
+- Signature above quote
+
+## 2.0.2 – 2022-10-17
+### Fixed
+- Modal glitches on Firefox when toggling autoresponder
+
+## 2.0.1 – 2022-10-13
+### Fixed
+- Int value out of range when accepting calendar invitation
+- Editor block quote handling
+
+## 2.0.0 – 2022-10-11
+### Added
+- Image support for the message editor and signatures
+- Automatic out-of-office replies (based on Sieve)
+- Preview of images, audio, video and PDF with the Viewer app
+- Add imip processing
+- Users can clear their mailboxes
+- Show warning for large signatures
+- Add ckeditor plugin for mail
+
+### Fixed
+- Enable last day checkbox not being parsed correctly
+- Date formatting for sieve autoresponder
+- Missing line breaks when parsing message from sieve script
+- Avatar being vanished for threads
+- Show empty content when opening drafts
+- Scrolling on small screen
+- Focus on *To* when the composer opens
+
+### Changed
+- Adapt to Nextcloud 25 design
+- Remember last used mailbox
+- Make primary action icons bigger
+- Improving the appearance of the modal window
+
+### Removed
+- Nextcloud 22-24 support
+
+## 1.14.3 - 2022-11-14
+### Fixed
+- Improve the size of padding bottom on threads
+- Improving the appearance of the modal window of composer
+- Scrolling and bottom padding for threads
+- Provisioning config not saving
+- Sending PGP messages as HTML
+- Important and favorite icon position
+- Copy to clipboard
+- Don't decode content for preview twice
+
+## 1.14.2 - 2022-11-03
+### Fixed
+- Transfer encoding issue
+
+## 1.14.1 - 2022-10-13
+### Changed
+- Updated Vue component library to v6
+
+## 1.14.0 - 2022-10-10
+### Added
+- Hide system tags from UI
+- Users can clear their mailboxes
+- Improve the image attachment viewer
+- Send oldest outbox message first
+- 'No subject' on thread when there is none
+- Migrate all icons to material design icons
+- Support for XOAUTH2
+- Preview message content in the thread view
+- Migrate icons to material design icons
+- Show message actions only for expanded messages in thread
+- Show mailbox counter if sub mailbox has unread messages
+- Show message preview in envelope list
+- Envelope action links to download whole message
+
+
+### Fixed
+- Performance logger message for vanished messages
+- Two-way binding for envelope unselect after delete
+- Split auto config and account creation
+- Account form styling
+- Edit drafts
+- Download all as zip
+- Restore ability to write mails in safari
+- Improve the way attachment look
+- Change the opacity of leftside icons to fit the rest of the icons
+- Infinite scrolling on mobile
+- Image preview when the menu is clicked
+- Make sender to be centered with the avatar and timestamps
+- Work around breaking server change and QB expressions
+- Better signature detection: always store the HTML version for the CKeditor body.
+- Quoting forwarded messages
+- l10n: Delete apostrophe
+- l10n: Delete a shortcut
+- Sending erroneous message repeatedly
+- Remove color from flagged message star
+- PI sync problems
+- Sending outbox message of deleted user accounts
+- Collecting addresses in the background
+- Remove account color
+- Shorten the relative time of envelopes
+- General design improvements
+- Redirect to setup page if no accounts are configured
+- Show empty content when opening drafts
+
+## 1.13.9 – 2022-10-07
+### Changed
+- Dependency updates
+
+## 1.13.6 - 2022-06-29
+### Fixed
+- Editing draft
+- Image attachment viewer
+
+## 1.13.5 - 2022-06-22
+- Make sender to be centered with the avatar and timestamp
+- Restore ability to write mails in safari
+
+## 1.13.4 - 2022-06-13
+### Fixed
+- Better signature detection
+- Forwarding more than one attachment
+
+## 1.13.3 - 2022-06-08
+### Fixed
+- Editing of outbox messages
+
+## 1.13.2 - 2022-06-07
+### Fixed
+- Quoting forwarded messages
+- Sending erroneous message repeatedly
+- Database platform check with Nextcloud <22.2
+- Missing Composer.vue::initBody call after mount
+
+## 1.13.1 – 2022-06-07
+### Fixed
+- Upgrade error on Nextcloud <22.2
+- Missing reply flagging and headers for edited outbox messages
+
+## 1.13.0 – 2022-06-02
+### Added
+- PHP8.1 support
+- Many performance improvements
+### Changed
+
+## 1.12.3 – 2022-06-07
+### Fixed
+- Missing reply flagging and headers for edited outbox messages
+
+- New material icons
+- Dropped Nextcloud 21 support (EOL)
+- Dropped PHP7.3 support (EOL)
+### Fixed
+- Leaking database cursor
+- Memory leaks
+- Causal read during outbox message/recipient insert
+- OCI compatibility
+- Forwarding attachments
+- Creating duplicate tags
+- Collecting recipient addresses in background
+- Priority inbox synchronization
+
+## 1.12.2 – 2022-06-02
+### Fixed
+- Modal width
+- Attachment forwarding
+- Reply/forward editor body
+- Sending messages of deleted accounts
+- OCI compatibility
+- Collecting recipient addresses in background
+- Priority inbox synchronization
+
+## 1.12.1 - 2022-05-24
+### Fixed
+- Prevent causal read for outbox message and recipient inserts
+- Hide subscribed / unsubscribed checkbox for "Favourites" folder
+- Fix attachment loss during outbox message update
+- Fix sending messages to groups
+- Fix composer not to open when we select envelope
+- Change the timeout value to fit the dialogs
+- Fix text format when closing the composer modal
+- Do not override existing aliases
+- Stop message from sending while editing
+- Fix html editor being always selected
+- Fix flagging replied messages
+- Fix modal size in different size of the screen
+- Show account color indicator only if several accounts are present
+- Consider passwordless signings when provisioning
+
+## 1.12.0 - 2022-04-26
+### Added
+- Local Outbox
+- Scheduled Sending
+- Undo Sending
+- Anti abuse detection
+- Time in-/senstive background jobs
+- Clipboard support, copy recipient to clipboard
+- Loading indicator for autosuggestion dropdown
+### Changed
+- General UI improvements and design fixes
+- Account setup error reporting
+- Downgrade KItinerary log line to info
+### Fixed
+- TypeError spamming logs when user not logged in
+- Sync error with empty UID list
+- array_merge needs at least one argument
+- Missing account aliases for new accounts
+
+## 1.11.7 - 2022-02-21
+### Added
+- Loading indicator for recipient suggestions
+### Fixed
+- Move KItinerary warning message to info
+
+## 1.11.6 - 2022-01-25
+### Fixed
+- Priority Inbox Sync
+- New Messages not loaded
+- Full links in plain text mails
+- Bold font for selected envelope(s) removed
+- BCC for email recipients query
+
+## 1.11.5 – 2021-12-28
+### Fixed
+- Use Parameters instead of Named Parameters for chunked queries
+- Mailbox showing at the wrong account
+- Column for account name that is too narrow
+- Mark as spam action
+- Chunk the recipients query
+
+## 1.11.4 – 2021-12-15
+### Fixed
+- Erroneous repair step during app store upgrade
+
+## 1.11.3 – 2021-12-15
+### Fixed
+- Fix message_id repair step
+
+## 1.11.2 – 2021-12-14
+### Fixed
+- Invalid message cache message_id and in_reply_to values
+
+## 1.11.1 – 2021-12-09
+### Fixed
+- Upgrades with Nextcloud 20
+- Initial sync runs into infinite loop
+- Initial sync stops too early
+- Save all attachments button
+- Database column types for message queries
+- Missing debug logs
+
+## 1.11.0 - 2021-11-29
+### Added
+- Nextcloud 23 support
+- Mark as important/unimportant for multiple messages
+- Provision aliases from an LDAP attribute
+- Anti spam reporting
+- Renaming of tag labels
+### Changed
+- Thread design overhaul
+- Show attachments inline
+- Spacing between accounts in sidebar
+- Width handling of some HTML messages
+- Show thread subject only once if unchanged
+- Improved auto config
+- Removed unread counter from trash mailbox
+### Fixed
+- IFrame sizing after print
+- Text quotes in plain text messages
+- Non-translatable strings
+- Missing unified inboxes colors
+
 ## 1.10.5 – 2021-09-28
 ### Fixed
 - Wrong iframe height

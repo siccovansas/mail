@@ -11,7 +11,7 @@ const amendEnvelopeWithIds = curry((accountId, envelope) => ({
 	...envelope,
 }))
 
-export function fetchEnvelope(id) {
+export function fetchEnvelope(accountId, id) {
 	const url = generateUrl('/apps/mail/api/messages/{id}', {
 		id,
 	})
@@ -19,6 +19,7 @@ export function fetchEnvelope(id) {
 	return axios
 		.get(url)
 		.then((resp) => resp.data)
+		.then(amendEnvelopeWithIds(accountId))
 		.catch((error) => {
 			if (error.response && error.response.status === 404) {
 				return undefined
@@ -53,7 +54,7 @@ export function fetchEnvelopes(accountId, mailboxId, query, cursor, limit) {
 			throw convertAxiosError(error)
 		})
 }
-export const fetchThread = async(id) => {
+export const fetchThread = async (id) => {
 	const url = generateUrl('apps/mail/api/messages/{id}/thread', {
 		id,
 	})
@@ -166,6 +167,23 @@ export async function fetchMessage(id) {
 	}
 }
 
+export async function fetchMessageItineraries(id) {
+	const url = generateUrl('/apps/mail/api/messages/{id}/itineraries', {
+		id,
+	})
+
+	try {
+		const resp = await axios.get(url)
+		return resp.data
+	} catch (error) {
+		if (error.response && error.response.status === 404) {
+			return undefined
+		}
+
+		throw parseErrorResponse(error.response)
+	}
+}
+
 export async function saveDraft(accountId, data) {
 	const url = generateUrl('/apps/mail/api/accounts/{accountId}/draft', {
 		accountId,
@@ -173,19 +191,6 @@ export async function saveDraft(accountId, data) {
 
 	try {
 		return (await axios.post(url, data)).data
-	} catch (e) {
-		throw convertAxiosError(e)
-	}
-}
-
-export async function sendMessage(accountId, data) {
-	const url = generateUrl('/apps/mail/api/accounts/{accountId}/send', {
-		accountId,
-	})
-
-	try {
-		const resp = await axios.post(url, data)
-		return resp.data
 	} catch (e) {
 		throw convertAxiosError(e)
 	}

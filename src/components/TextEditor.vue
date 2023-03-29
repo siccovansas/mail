@@ -2,8 +2,9 @@
   - @copyright 2019 Christoph Wurst <christoph@winzerhof-wurst.at>
   -
   - @author 2019 Christoph Wurst <christoph@winzerhof-wurst.at>
+  - @author 2022 Richard Steinmetz <richard@steinmetz.cloud>
   -
-  - @license GNU AGPL version 3 or any later version
+  - @license AGPL-3.0-or-later
   -
   - This program is free software: you can redistribute it and/or modify
   - it under the terms of the GNU Affero General Public License as
@@ -22,10 +23,11 @@
 <template>
 	<ckeditor
 		v-if="ready"
-		v-model="text"
+		:value="value"
 		:config="config"
 		:editor="editor"
-		@input="onInput"
+		:disabled="disabled"
+		@input="onEditorInput"
 		@ready="onEditorReady" />
 </template>
 
@@ -36,15 +38,23 @@ import Editor from '@ckeditor/ckeditor5-editor-balloon/src/ballooneditor'
 import EssentialsPlugin from '@ckeditor/ckeditor5-essentials/src/essentials'
 import BlockQuotePlugin from '@ckeditor/ckeditor5-block-quote/src/blockquote'
 import BoldPlugin from '@ckeditor/ckeditor5-basic-styles/src/bold'
+import FontPlugin from '@ckeditor/ckeditor5-font/src/font'
+import ParagraphPlugin from '@ckeditor/ckeditor5-paragraph/src/paragraph'
 import HeadingPlugin from '@ckeditor/ckeditor5-heading/src/heading'
 import ItalicPlugin from '@ckeditor/ckeditor5-basic-styles/src/italic'
 import LinkPlugin from '@ckeditor/ckeditor5-link/src/link'
 import ListStyle from '@ckeditor/ckeditor5-list/src/liststyle'
+import RemoveFormat from '@ckeditor/ckeditor5-remove-format/src/removeformat'
 import SignaturePlugin from '../ckeditor/signature/SignaturePlugin'
+import StrikethroughPlugin from '@ckeditor/ckeditor5-basic-styles/src/strikethrough'
 import QuotePlugin from '../ckeditor/quote/QuotePlugin'
+import Base64UploadAdapter from '@ckeditor/ckeditor5-upload/src/adapters/base64uploadadapter'
+import ImagePlugin from '@ckeditor/ckeditor5-image/src/image'
+import ImageResizePlugin from '@ckeditor/ckeditor5-image/src/imageresize'
+import ImageUploadPlugin from '@ckeditor/ckeditor5-image/src/imageupload'
+import MailPlugin from '../ckeditor/mail/MailPlugin'
 
 import { getLanguage } from '@nextcloud/l10n'
-import DOMPurify from 'dompurify'
 
 import logger from '../logger'
 
@@ -74,18 +84,53 @@ export default {
 			type: Object,
 			required: true,
 		},
+		disabled: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	data() {
-		const plugins = [EssentialsPlugin, SignaturePlugin, QuotePlugin]
+		const plugins = [EssentialsPlugin, ParagraphPlugin, SignaturePlugin, QuotePlugin]
 		const toolbar = ['undo', 'redo']
 
 		if (this.html) {
-			plugins.push(...[HeadingPlugin, AlignmentPlugin, BoldPlugin, ItalicPlugin, BlockQuotePlugin, LinkPlugin, ListStyle])
-			toolbar.unshift(...['heading', 'alignment', 'bold', 'italic', 'bulletedList', 'numberedList', 'blockquote', 'link'])
+			plugins.push(...[
+				HeadingPlugin,
+				AlignmentPlugin,
+				BoldPlugin,
+				ItalicPlugin,
+				BlockQuotePlugin,
+				LinkPlugin,
+				ListStyle,
+				FontPlugin,
+				RemoveFormat,
+				StrikethroughPlugin,
+				ImagePlugin,
+				ImageUploadPlugin,
+				Base64UploadAdapter,
+				ImageResizePlugin,
+				MailPlugin,
+			])
+			toolbar.unshift(...[
+				'heading',
+				'fontFamily',
+				'fontSize',
+				'bold',
+				'italic',
+				'fontColor',
+				'imageUpload',
+				'alignment',
+				'bulletedList',
+				'numberedList',
+				'blockquote',
+				'fontBackgroundColor',
+				'strikethrough',
+				'link',
+				'removeFormat',
+			])
 		}
 
 		return {
-			text: '',
 			ready: false,
 			editor: Editor,
 			config: {
@@ -97,19 +142,6 @@ export default {
 				language: 'en',
 			},
 		}
-	},
-	computed: {
-		sanitizedValue() {
-			return DOMPurify.sanitize(this.value, {
-				FORBID_TAGS: ['style'],
-			})
-		},
-	},
-	watch: {
-		sanitizedValue(newVal) {
-			// needed for reset in composer
-			this.text = newVal
-		},
 	},
 	beforeMount() {
 		this.loadEditorTranslations(getLanguage())
@@ -141,60 +173,26 @@ export default {
 
 			this.ready = true
 		},
+		/**
+		 * @param {module:core/editor/editor~Editor} editor editor the editor instance
+		 */
 		onEditorReady(editor) {
-			const schema = editor.model.schema
-
-			logger.debug('CKEditor editor is ready', { editor, schema })
-
+			logger.debug('TextEditor is ready', { editor })
 			this.editorInstance = editor
 
-			// Set 0 pixel margin to all <p> elements
-			editor.conversion.for('downcast').add((dispatcher) => {
-				dispatcher.on(
-					'insert:paragraph',
-					(evt, data, conversionApi) => {
-						const viewWriter = conversionApi.writer
-						viewWriter.setStyle('margin', '0', conversionApi.mapper.toViewElement(data.item))
-					},
-					{
-						priority: 'low',
-					}
-				)
-			})
-
-			schema.on(
-				'checkChild',
-				(evt, args) => {
-					const context = args[0]
-
-					if (context.endsWith('blockQuote')) {
-						// Prevent next listeners from being called.
-						evt.stop()
-						// Set the checkChild()'s return value.
-						evt.return = true
-					}
-				},
-				{
-					priority: 'highest',
-				}
-			)
 			if (this.focus) {
 				logger.debug('focusing TextEditor')
 				editor.editing.view.focus()
 			}
 
-			// Set value as late as possible, so the custom schema listener is used
-			// for the initial editor model
-			this.text = this.sanitizedValue
-
-			logger.debug(`setting TextEditor contents to <${this.text}>`)
-
-			this.bus.$on('appendToBodyAtCursor', this.appendToBodyAtCursor)
-			this.bus.$on('insertSignature', this.onInsertSignature)
+			this.bus.$on('append-to-body-at-cursor', this.appendToBodyAtCursor)
+			this.$emit('ready', editor)
 		},
-		onInput() {
-			logger.debug(`TextEditor input changed to <${this.text}>`)
-			this.$emit('input', this.text)
+		onEditorInput(text) {
+			if (text !== this.value) {
+				logger.debug(`TextEditor input changed to <${text}>`)
+				this.$emit('input', text)
+			}
 		},
 		appendToBodyAtCursor(toAppend) {
 			// https://ckeditor.com/docs/ckeditor5/latest/builds/guides/faq.html#where-are-the-editorinserthtml-and-editorinserttext-methods-how-to-insert-some-content
@@ -202,21 +200,34 @@ export default {
 			const modelFragment = this.editorInstance.data.toModel(viewFragment)
 			this.editorInstance.model.insertContent(modelFragment)
 		},
-		onInsertSignature(signatureParam, signatureAboveQuoteParam) {
-			this.editorInstance.execute('insertSignature', {
-				signature: signatureParam,
-				signatureAboveQuote: signatureAboveQuoteParam,
-			})
+		editorExecute(commandName, ...args) {
+			if (this.editorInstance) {
+				this.editorInstance.execute(commandName, ...args)
+			} else {
+				throw new Error('Impossible to execute a command before editor is ready.')
+			}
 		},
 	},
 }
 </script>
 
 <style lang="scss" scoped>
-::v-deep a {
+
+:deep(a) {
 	color: #07d;
 }
-::v-deep p {
+:deep(p) {
 	cursor: text;
+	margin: 0 !important;
+}
+</style>
+
+<style>
+/*
+Overwrite the default z-index for CKEditor
+https://github.com/ckeditor/ckeditor5/issues/1142
+ */
+:root {
+	--ck-z-default: 10000;
 }
 </style>

@@ -6,6 +6,7 @@ declare(strict_types=1);
  * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Lukas Reschke <lukas@statuscode.ch>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Richard Steinmetz <richard@steinmetz.cloud>
  *
  * Mail
  *
@@ -60,6 +61,16 @@ return [
 			'verb' => 'GET'
 		],
 		[
+			'name' => 'page#outbox',
+			'url' => '/outbox',
+			'verb' => 'GET'
+		],
+		[
+			'name' => 'page#outboxMessage',
+			'url' => '/outbox/{messageId}',
+			'verb' => 'GET'
+		],
+		[
 			'name' => 'page#compose',
 			'url' => '/compose',
 			'verb' => 'GET'
@@ -68,11 +79,6 @@ return [
 			'name' => 'page#mailto',
 			'url' => '/mailto',
 			'verb' => 'GET'
-		],
-		[
-			'name' => 'accounts#send',
-			'url' => '/api/accounts/{id}/send',
-			'verb' => 'POST'
 		],
 		[
 			'name' => 'accounts#draft',
@@ -90,9 +96,29 @@ return [
 			'verb' => 'PUT'
 		],
 		[
+			'name' => 'accounts#updateSmimeCertificate',
+			'url' => '/api/accounts/{id}/smime-certificate',
+			'verb' => 'PUT'
+		],
+		[
 			'name' => 'accounts#getQuota',
 			'url' => '/api/accounts/{id}/quota',
 			'verb' => 'GET'
+		],
+		[
+			'name' => 'autoConfig#queryIspdb',
+			'url' => '/api/autoconfig/ispdb/{email}',
+			'verb' => 'GET',
+		],
+		[
+			'name' => 'autoConfig#queryMx',
+			'url' => '/api/autoconfig/mx/{email}',
+			'verb' => 'GET',
+		],
+		[
+			'name' => 'autoConfig#testConnectivity',
+			'url' => '/api/autoconfig/test',
+			'verb' => 'GET',
 		],
 		[
 			'name' => 'tags#create',
@@ -145,6 +171,11 @@ return [
 			'verb' => 'DELETE'
 		],
 		[
+			'name' => 'mailboxes#clearMailbox',
+			'url' => '/api/mailboxes/{id}/clear',
+			'verb' => 'POST'
+		],
+		[
 			'name' => 'mailboxes#markAllAsRead',
 			'url' => '/api/mailboxes/{id}/read',
 			'verb' => 'POST'
@@ -175,8 +206,18 @@ return [
 			'verb' => 'GET'
 		],
 		[
+			'name' => 'messages#getItineraries',
+			'url' => '/api/messages/{id}/itineraries',
+			'verb' => 'GET'
+		],
+		[
 			'name' => 'messages#getSource',
 			'url' => '/api/messages/{id}/source',
+			'verb' => 'GET'
+		],
+		[
+			'name' => 'messages#export',
+			'url' => '/api/messages/{id}/export',
 			'verb' => 'GET'
 		],
 		[
@@ -270,6 +311,11 @@ return [
 			'verb' => 'DELETE'
 		],
 		[
+			'name' => 'settings#setAllowNewMailAccounts',
+			'url' => '/api/settings/allownewaccounts',
+			'verb' => 'POST'
+		],
+		[
 			'name' => 'trusted_senders#setTrusted',
 			'url' => '/api/trustedsenders/{email}',
 			'verb' => 'PUT'
@@ -308,7 +354,42 @@ return [
 			'name' => 'thread#move',
 			'url' => '/api/thread/{id}',
 			'verb' => 'POST'
-		]
+		],
+		[
+			'name' => 'outbox#send',
+			'url' => '/api/outbox/{id}',
+			'verb' => 'POST'
+		],
+		[
+			'name' => 'googleIntegration#configure',
+			'url' => '/api/integration/google',
+			'verb' => 'POST',
+		],
+		[
+			'name' => 'googleIntegration#unlink',
+			'url' => '/api/integration/google',
+			'verb' => 'DELETE',
+		],
+		[
+			'name' => 'googleIntegration#oauthRedirect',
+			'url' => '/integration/google-auth',
+			'verb' => 'GET',
+		],
+		[
+			'name' => 'microsoftIntegration#configure',
+			'url' => '/api/integration/microsoft',
+			'verb' => 'POST',
+		],
+		[
+			'name' => 'microsoftIntegration#unlink',
+			'url' => '/api/integration/microsoft',
+			'verb' => 'DELETE',
+		],
+		[
+			'name' => 'microsoftIntegration#oauthRedirect',
+			'url' => '/integration/microsoft-auth',
+			'verb' => 'GET',
+		],
 	],
 	'resources' => [
 		'accounts' => ['url' => '/api/accounts'],
@@ -317,6 +398,8 @@ return [
 		'localAttachments' => ['url' => '/api/attachments'],
 		'mailboxes' => ['url' => '/api/mailboxes'],
 		'messages' => ['url' => '/api/messages'],
+		'outbox' => ['url' => '/api/outbox'],
 		'preferences' => ['url' => '/api/preferences'],
+		'smimeCertificates' => ['url' => '/api/smime/certificates'],
 	]
 ];
