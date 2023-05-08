@@ -144,7 +144,7 @@ export default {
 				await this.setSentMailboxAndResend(account, sentMailboxId, data)
 				return
 			}
-			logger.info('creating automated_sent mailbox')
+			logger.info(`creating ${t('mail', 'Sent')} mailbox`)
 			await this.$store
 				.dispatch('createMailbox', { account, name: account.personalNamespace + t('mail', 'Sent') })
 				.then((e) => {
