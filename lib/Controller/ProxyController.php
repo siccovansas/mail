@@ -103,14 +103,14 @@ class ProxyController extends Controller {
 	 * @return ProxyDownloadResponse
 	 */
 	public function proxy(string $src): ProxyDownloadResponse {
+		// close the session to allow parallel downloads
+		$this->session->close();
+
 		// If strict cookies are set it means we come from the same domain so no open redirect
 		if (!$this->request->passesStrictCookieCheck()) {
 			$content = file_get_contents(__DIR__ . '/../../img/blocked-image.png');
 			return new ProxyDownloadResponse($content, $src, 'application/octet-stream');
 		}
-
-		// close the session to allow parallel downloads
-		$this->session->close();
 
 		$client = $this->clientService->newClient();
 		try {
