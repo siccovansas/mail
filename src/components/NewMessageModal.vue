@@ -213,7 +213,7 @@ export default {
 					const dataForServer = this.getDataForServer(data, true)
 					if (!id) {
 						const { id } = await saveDraft(data.account, dataForServer)
-						await this.$store.dispatch('patchComposerData', { id, draftId: dataForServer.id })
+						await this.$store.dispatch('patchComposerData', { id, draftId: dataForServer.draftId })
 						this.canSaveDraft = true
 						this.draftSaved = true
 

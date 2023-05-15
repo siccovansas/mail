@@ -489,11 +489,13 @@ export default {
 			// Restore original sendAt timestamp when requested
 			const message = getters.composerMessage
 			if (restoreOriginalSendAt && message.type === 'outbox' && message.options?.originalSendAt) {
-
+				const body = message.data.body
+				message.body = message.data.isHtml ? body.value : toPlain(body).value
+				message.sendAt = message.options.originalSendAt
 				updateDraft(message)
 			}
 			if (moveToImap) {
-				const draftId = await moveDraft(id)
+				 await moveDraft(id)
 			}
 
 			commit('stopComposerSession')
