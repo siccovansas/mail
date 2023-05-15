@@ -79,7 +79,7 @@ class DraftsController extends Controller {
 	 * @param int|null $smimeCertificateId
 	 * @param int|null $sendAt
 	 * @param int|null $draftId
-	 * 
+	 *
 	 * @return JsonResponse
 	 * @throws DoesNotExistException
 	 * @throws ClientException
@@ -91,8 +91,8 @@ class DraftsController extends Controller {
 		string  $body,
 		string  $editorBody,
 		bool    $isHtml,
-		bool $smimeSign,
-		bool $smimeEncrypt,
+		?bool $smimeSign,
+		?bool $smimeEncrypt,
 		array   $to = [],
 		array   $cc = [],
 		array   $bcc = [],
@@ -159,8 +159,8 @@ class DraftsController extends Controller {
 		string  $body,
 		string  $editorBody,
 		bool    $isHtml,
-		bool $smimeSign,
-		bool $smimeEncrypt,
+		?bool $smimeSign,
+		?bool $smimeEncrypt,
 		bool    $failed = false,
 		array   $to = [],
 		array   $cc = [],

@@ -483,7 +483,7 @@ export default {
 			}
 		})
 	},
-	async stopComposerSession({ commit, dispatch, getters }, { restoreOriginalSendAt = false, moveToImap = false, id,} = {}) {
+	async stopComposerSession({ commit, dispatch, getters }, { restoreOriginalSendAt = false, moveToImap = false, id } = {}) {
 		return handleHttpAuthErrors(commit, async () => {
 
 			// Restore original sendAt timestamp when requested
@@ -493,7 +493,7 @@ export default {
 				updateDraft(message)
 			}
 			if (moveToImap) {
-				const draftId= await moveDraft(id)
+				const draftId = await moveDraft(id)
 			}
 
 			commit('stopComposerSession')

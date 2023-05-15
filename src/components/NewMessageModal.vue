@@ -145,6 +145,7 @@ export default {
 			warning: undefined,
 			modalFirstOpen: true,
 			cookedComposerData: undefined,
+			changed: false,
 		}
 	},
 	computed: {
@@ -202,6 +203,7 @@ export default {
 				logger.info('Ignoring draft because there is no message anymore', { data })
 				return this.draftsPromise
 			}
+			this.changed = true
 
 			this.draftsPromise = this.draftsPromise.then(async (id) => {
 				this.savingDraft = true
@@ -422,7 +424,7 @@ export default {
 			this.modalFirstOpen = false
 
 			await this.$store.dispatch('closeMessageComposer')
-			if (!this.$store.getters.composerMessageIsSaved) {
+			if (!this.$store.getters.composerMessageIsSaved && this.changed) {
 				await this.onDraft(this.cookedComposerData, { showToast: true })
 			}
 
@@ -436,7 +438,7 @@ export default {
 				logger.debug('Closing composer session due to close button click')
 				await this.$store.dispatch('stopComposerSession', {
 					restoreOriginalSendAt: true,
-					moveToImap: true,
+					moveToImap: this.changed,
 					id: this.composerData.id,
 				})
 
