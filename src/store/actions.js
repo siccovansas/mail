@@ -77,7 +77,7 @@ import {
 	syncEnvelopes,
 	updateEnvelopeTag,
 } from '../service/MessageService'
-import { moveDraft ,updateDraft} from '../service/DraftService'
+import { moveDraft, updateDraft } from '../service/DraftService'
 import * as AliasService from '../service/AliasService'
 import logger from '../logger'
 import { normalizedEnvelopeListId } from './normalization'
@@ -483,7 +483,7 @@ export default {
 			}
 		})
 	},
-	stopComposerSession({ commit, dispatch, getters }, { restoreOriginalSendAt = false, moveToImap=false,id } = {}) {
+	async stopComposerSession({ commit, dispatch, getters }, { restoreOriginalSendAt = false, moveToImap = false, id,} = {}) {
 		return handleHttpAuthErrors(commit, async () => {
 
 			// Restore original sendAt timestamp when requested
@@ -492,9 +492,8 @@ export default {
 
 				updateDraft(message)
 			}
-			if(moveToImap){
-			moveDraft(id)
-
+			if (moveToImap) {
+				const draftId= await moveDraft(id)
 			}
 
 			commit('stopComposerSession')
