@@ -36,6 +36,7 @@ use OCA\Mail\Exception\ServiceException;
 use OCA\Mail\Http\JsonResponse;
 use OCA\Mail\Service\AccountService;
 use OCA\Mail\Service\DraftsService;
+use OCA\Mail\Service\SmimeService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\DB\Exception;
@@ -51,6 +52,7 @@ class DraftsControllerTest extends TestCase {
 		$this->request = $this->createMock(IRequest::class);
 		$this->accountService = $this->createMock(AccountService::class);
 		$this->timeFactory = $this->createMock(ITimeFactory::class);
+		$this->smimeService = $this->createMock(SmimeService::class);
 
 		$this->controller = new DraftsController(
 			$this->appName,
@@ -58,7 +60,8 @@ class DraftsControllerTest extends TestCase {
 			$this->request,
 			$this->service,
 			$this->accountService,
-			$this->timeFactory
+			$this->timeFactory,
+			$this->smimeService
 		);
 	}
 
@@ -227,6 +230,8 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			$to,
 			$cc,
 			[],
@@ -274,12 +279,15 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			$to,
 			$cc,
 			[],
 			[],
 			$message->getAliasId(),
 			$message->getInReplyToMessageId(),
+			null,
 			null,
 			1
 		);
@@ -319,6 +327,8 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			[],
 			[],
 			[],
@@ -358,6 +368,8 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			$to,
 			$cc,
 			[],
@@ -394,6 +406,8 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			$to,
 			$cc,
 			[],
@@ -440,6 +454,8 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			false,
 			$to,
 			$cc,
@@ -490,6 +506,8 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			false,
 			$to,
 			$cc,
@@ -536,6 +554,8 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			false,
 			$to,
 			$cc,
@@ -585,6 +605,8 @@ class DraftsControllerTest extends TestCase {
 			$message->getBody(),
 			'<p>message</p>',
 			$message->isHtml(),
+			null,
+			null,
 			false,
 			$to,
 			$cc,
