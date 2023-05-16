@@ -84,7 +84,7 @@
 				</div>
 				<div class="envelope__header__left__unsubscribe">
 					<ButtonVue
-						v-if="message && (message.unsubscribeUrl || message.unsubscribeMailto)"
+						v-if="message && message.dkimIsValid && (message.unsubscribeUrl || message.unsubscribeMailto)"
 						type="tertiary"
 						class="envelope__header__unsubscribe"
 						@click="showListUnsubscribeConfirmation = true">
@@ -199,14 +199,14 @@
 			:data="error"
 			:auto-margin="true"
 			role="alert" />
-		<ConfirmModal v-if="message && message.dkimIsValid && message.unsubscribeUrl && message.isOneClickUnsubscribe && showListUnsubscribeConfirmation"
+		<ConfirmModal v-if="message && message.unsubscribeUrl && message.isOneClickUnsubscribe && showListUnsubscribeConfirmation"
 			:confirm-text="t('mail', 'Unsubscribe')"
 			:title="t('mail', 'Unsubscribe via link')"
 			@cancel="showListUnsubscribeConfirmation = false"
 			@confirm="unsubscribeViaOneClick">
 			{{ t('mail', 'Unsubscribing will stop all messages from the mailing list {sender}', { sender: from }) }}
 		</ConfirmModal>
-		<ConfirmModal v-else-if="message && message.dkimIsValid && message.unsubscribeUrl && showListUnsubscribeConfirmation"
+		<ConfirmModal v-else-if="message && message.unsubscribeUrl && showListUnsubscribeConfirmation"
 			:confirm-text="t('mail', 'Unsubscribe')"
 			:confirm-url="message.unsubscribeUrl"
 			:title="t('mail', 'Unsubscribe via link')"
@@ -214,7 +214,7 @@
 			@confirm="showListUnsubscribeConfirmation = false">
 			{{ t('mail', 'Unsubscribing will stop all messages from the mailing list {sender}', { sender: from }) }}
 		</ConfirmModal>
-		<ConfirmModal v-else-if="message && message.dkimIsValid && message.unsubscribeMailto && showListUnsubscribeConfirmation"
+		<ConfirmModal v-else-if="message && message.unsubscribeMailto && showListUnsubscribeConfirmation"
 			:confirm-text="t('mail', 'Send unsubscribe email')"
 			:title="t('mail', 'Unsubscribe via email')"
 			:disabled="unsubscribing"
