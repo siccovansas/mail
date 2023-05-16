@@ -247,6 +247,9 @@ class MessagesController extends Controller {
 		}
 		$json['smime'] = $smimeData;
 
+		$json['dkimIsValid'] = $message->getDkimStatus() === Message::DKIM_STATUS_PASS;
+		$json['dkimReason'] = $message->getDkimReason();
+
 		$response = new JSONResponse($json);
 
 		// Enable caching

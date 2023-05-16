@@ -38,14 +38,22 @@ class MessageStructureData {
 
 	private bool $isEncrypted;
 
+	private int $dkimStatus;
+
+	private string $dkimReason;
+
 	public function __construct(bool $hasAttachments,
-								string $previewText,
-								bool $isImipMessage,
-								bool $isEncrypted) {
+		string $previewText,
+		bool $isImipMessage,
+		bool $isEncrypted,
+		int $dkimStatus,
+		string $dkimReason) {
 		$this->hasAttachments = $hasAttachments;
 		$this->previewText = $previewText;
 		$this->isImipMessage = $isImipMessage;
 		$this->isEncrypted = $isEncrypted;
+		$this->dkimStatus = $dkimStatus;
+		$this->dkimReason = $dkimReason;
 	}
 
 	public function hasAttachments(): bool {
@@ -62,5 +70,13 @@ class MessageStructureData {
 
 	public function isEncrypted(): bool {
 		return $this->isEncrypted;
+	}
+
+	public function getDkimStatus(): int {
+		return $this->dkimStatus;
+	}
+
+	public function getDkimReason(): string {
+		return $this->dkimReason;
 	}
 }

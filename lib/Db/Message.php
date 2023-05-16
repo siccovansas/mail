@@ -85,6 +85,10 @@ use function json_encode;
  * @method void setImipError(bool $imipError)
  * @method bool|null isEncrypted()
  * @method void setEncrypted(bool|null $encrypted)
+ * @method int|null getDkimStatus()
+ * @method void setDkimStatus(int $status)
+ * @method string|null getDkimReason()
+ * @method void setDkimReason(string $reason)
  */
 class Message extends Entity implements JsonSerializable {
 	private const MUTABLE_FLAGS = [
@@ -100,6 +104,11 @@ class Message extends Entity implements JsonSerializable {
 		Tag::LABEL_IMPORTANT,
 		'$important' // @todo remove this when we have removed all references on IMAP to $important @link https://github.com/nextcloud/mail/issues/25
 	];
+
+	public const DKIM_STATUS_PENDING = 0;
+	public const DKIM_STATUS_NONE = 1;
+	public const DKIM_STATUS_FAIL = 2;
+	public const DKIM_STATUS_PASS = 3;
 
 	protected $uid;
 	protected $messageId;
@@ -147,6 +156,11 @@ class Message extends Entity implements JsonSerializable {
 	/** @var Tag[] */
 	private $tags = [];
 
+	/** @var string|null */
+	protected $dkimStatus;
+	/** @var string|null */
+	protected $dkimReason;
+
 	public function __construct() {
 		$this->from = new AddressList([]);
 		$this->to = new AddressList([]);
@@ -173,6 +187,8 @@ class Message extends Entity implements JsonSerializable {
 		$this->addType('imipProcessed', 'boolean');
 		$this->addType('imipError', 'boolean');
 		$this->addType('encrypted', 'boolean');
+		$this->addType('dkimStatus', 'integer');
+		$this->addType('dkimReason', 'string');
 	}
 
 	/**
@@ -340,6 +356,8 @@ class Message extends Entity implements JsonSerializable {
 			'imipMessage' => $this->isImipMessage(),
 			'previewText' => $this->getPreviewText(),
 			'encrypted' => ($this->isEncrypted() === true),
+			'dkimStatus' => $this->getDkimStatus(),
+			'dkimReason' => $this->getDkimReason(),
 		];
 	}
 }

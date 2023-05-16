@@ -491,6 +491,8 @@ class MessageMapper extends QBMapper {
 				->set('updated_at', $query->createNamedParameter($this->timeFactory->getTime(), IQueryBuilder::PARAM_INT))
 				->set('imip_message', $query->createParameter('imip_message'))
 				->set('encrypted', $query->createParameter('encrypted'))
+				->set('dkim_status', $query->createParameter('dkim_status'))
+				->set('dkim_reason', $query->createParameter('dkim_reason'))
 				->where($query->expr()->andX(
 					$query->expr()->eq('uid', $query->createParameter('uid')),
 					$query->expr()->eq('mailbox_id', $query->createParameter('mailbox_id'))
@@ -518,6 +520,8 @@ class MessageMapper extends QBMapper {
 				);
 				$query->setParameter('imip_message', $message->isImipMessage(), IQueryBuilder::PARAM_BOOL);
 				$query->setParameter('encrypted', $message->isEncrypted(), IQueryBuilder::PARAM_BOOL);
+				$query->setParameter('dkim_status', $message->getDkimStatus(), IQueryBuilder::PARAM_INT);
+				$query->setParameter('dkim_reason', $message->getDkimReason(), IQueryBuilder::PARAM_STR);
 
 				$query->executeStatement();
 			}

@@ -40,11 +40,13 @@ use Horde_Mime_Part;
 use Html2Text\Html2Text;
 use OCA\Mail\Attachment;
 use OCA\Mail\Db\Mailbox;
+use OCA\Mail\Db\Message;
 use OCA\Mail\Exception\ServiceException;
 use OCA\Mail\Model\IMAPMessage;
 use OCA\Mail\Service\SmimeService;
 use OCA\Mail\Support\PerformanceLoggerTask;
 use OCP\AppFramework\Db\DoesNotExistException;
+use PHPMailer\DKIMValidator\Validator;
 use Psr\Log\LoggerInterface;
 use function array_filter;
 use function array_map;
@@ -845,6 +847,9 @@ class MessageMapper {
 			'cache' => true,
 			'peek' => true,
 		]);
+		$structureQuery->fullText([
+			'peek' => true,
+		]);
 		$this->smimeService->addEncryptionCheckQueries($structureQuery);
 
 		$structures = $client->fetch($mailbox, $structureQuery, [
@@ -856,9 +861,27 @@ class MessageMapper {
 			$text = '';
 			$isImipMessage = false;
 			$isEncrypted = false;
+			$dkimStatus = Message::DKIM_STATUS_NONE;
+			$dkimReason = '';
 
 			if ($this->smimeService->isEncrypted($fetchData)) {
 				$isEncrypted = true;
+			}
+
+			$validator = new Validator($fetchData->getFullMsg());
+			$results = $validator->validate();
+
+			if (count($results) > 0) {
+				foreach ($results as $result) {
+					if ($result[0]['status'] === 'SUCCESS') {
+						$dkimStatus = Message::DKIM_STATUS_PASS;
+						$dkimReason = '';
+						break;
+					} else {
+						$dkimStatus = Message::DKIM_STATUS_FAIL;
+						$dkimReason = $result[0]['reason'];
+					}
+				}
 			}
 
 			$structure = $fetchData->getStructure();
@@ -881,7 +904,7 @@ class MessageMapper {
 			$textBodyId = $structure->findBody() ?? $structure->findBody('text');
 			$htmlBodyId = $structure->findBody('html');
 			if ($textBodyId === null && $htmlBodyId === null) {
-				return new MessageStructureData($hasAttachments, $text, $isImipMessage, $isEncrypted);
+				return new MessageStructureData($hasAttachments, $text, $isImipMessage, $isEncrypted, $dkimStatus, $dkimReason);
 			}
 			$partsQuery = new Horde_Imap_Client_Fetch_Query();
 			if ($htmlBodyId !== null) {
@@ -907,7 +930,7 @@ class MessageMapper {
 			$part = $parts[$fetchData->getUid()];
 			// This is sus - why does this even happen? A delete / move in the middle of this processing?
 			if ($part === null) {
-				return new MessageStructureData($hasAttachments, $text, $isImipMessage, $isEncrypted);
+				return new MessageStructureData($hasAttachments, $text, $isImipMessage, $isEncrypted, $dkimStatus, $dkimReason);
 			}
 			$textBody = $part->getBodyPart($textBodyId);
 			if (!empty($textBody)) {
@@ -922,6 +945,8 @@ class MessageMapper {
 					$textBody,
 					$isImipMessage,
 					$isEncrypted,
+					$dkimStatus,
+					$dkimReason
 				);
 			}
 
@@ -940,9 +965,11 @@ class MessageMapper {
 					trim($html->getText()),
 					$isImipMessage,
 					$isEncrypted,
+					$dkimStatus,
+					$dkimReason,
 				);
 			}
-			return new MessageStructureData($hasAttachments, $text, $isImipMessage, $isEncrypted);
+			return new MessageStructureData($hasAttachments, $text, $isImipMessage, $isEncrypted, $dkimStatus, $dkimReason);
 		}, iterator_to_array($structures->getIterator()));
 	}
 }

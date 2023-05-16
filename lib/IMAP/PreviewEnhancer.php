@@ -68,7 +68,7 @@ class PreviewEnhancer {
 	 */
 	public function process(Account $account, Mailbox $mailbox, array $messages): array {
 		$needAnalyze = array_reduce($messages, static function (array $carry, Message $message) {
-			if ($message->getStructureAnalyzed()) {
+			if ($message->getStructureAnalyzed() && $message->getDkimStatus() !== Message::DKIM_STATUS_PENDING) {
 				// Nothing to do
 				return $carry;
 			}
@@ -112,6 +112,8 @@ class PreviewEnhancer {
 			$message->setStructureAnalyzed(true);
 			$message->setImipMessage($structureData->isImipMessage());
 			$message->setEncrypted($structureData->isEncrypted());
+			$message->setDkimStatus($structureData->getDkimStatus());
+			$message->setDkimReason($structureData->getDkimReason());
 
 			return $message;
 		}, $messages));
